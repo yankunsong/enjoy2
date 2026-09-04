@@ -803,13 +803,18 @@ const createRecording = (file: string, type: string, referenceId: number) =>
     targetType: "Audio",
     referenceId,
     referenceText: "Ask not what your country can do for you",
-    // Encoded by the browser bridge's own encoder, so the wire form this is
-    // asserted against is the one that ships rather than a copy of it.
-    blob: {
-      type,
-      arrayBuffer: encodeBinary(toArrayBuffer(fs.readFileSync(file))),
-    },
+    blob: blobOf(file, type),
   });
+
+/**
+ * A file as the browser hands one over: bytes inside the argument list, encoded
+ * by the browser bridge's own encoder, so the wire form asserted against is the
+ * one that ships rather than a copy of it.
+ */
+const blobOf = (file: string, type: string) => ({
+  type,
+  arrayBuffer: encodeBinary(toArrayBuffer(fs.readFileSync(file))),
+});
 
 const toArrayBuffer = (bytes: Buffer) =>
   bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
@@ -1089,6 +1094,118 @@ test("still has the Diary, unchanged, after a restart", async () => {
   expect(body.result.title).toBe(before.title);
   expect(body.result.content).toBe(before.content);
   expect(body.result.config).toEqual(before.config);
+});
+
+/**
+ * A Diary's Speech, and the rule that makes editing a Diary safe: a Speech is
+ * found by the exact text it speaks. Changing the text means there is no Speech
+ * for it yet, not that the one already there has been rewritten.
+ *
+ * Synthesis itself runs in the renderer against a third-party service and stays
+ * out of reach here; only persisting the result crosses this seam. So one of
+ * the audio samples the repository ships stands in for what the service handed
+ * back, its bytes travelling inside the argument list, encoded by the browser
+ * bridge's own encoder — the same crossing a Recording makes.
+ */
+
+const SPOKEN_TEXT = "The tide was out and the boats were lying on their sides.";
+const REWRITTEN_TEXT = "The tide was out and the boats lay on their sides.";
+
+const VOICE = {
+  engine: "elevenlabs",
+  model: "eleven_multilingual_v2",
+  voice: "Rachel",
+};
+
+const createSpeech = (diaryId: string, text: string) =>
+  ipc(
+    "speeches-create",
+    {
+      sourceId: diaryId,
+      sourceType: "Diary",
+      text,
+      // A Diary is spoken whole, so there is only ever the first of each.
+      section: 0,
+      segment: 0,
+      configuration: VOICE,
+    },
+    blobOf(SAMPLE_AUDIO, "audio/mp3")
+  );
+
+const findSpeech = (diaryId: string, text: string) =>
+  ipc("speeches-find-one", { sourceId: diaryId, sourceType: "Diary", text });
+
+/** Where the Library keeps a Speech, which is under the local user's own directory. */
+const speechFile = async (filename: string) => {
+  const userId = (await ipc("app-settings-get-user")).body.result.id;
+
+  return path.join(
+    resultDir,
+    LIBRARY_PATH_SUFFIX,
+    String(userId),
+    "speeches",
+    filename
+  );
+};
+
+// The Diary that gets spoken, and then rewritten underneath its Speech.
+let spokenDiaryId: string;
+let diarySpeech: any;
+
+test("keeps a Diary's Speech, found by the exact text it speaks", async () => {
+  spokenDiaryId = (await createDiary({ content: SPOKEN_TEXT })).body.result.id;
+
+  const created = await createSpeech(spokenDiaryId, SPOKEN_TEXT);
+  expect(created.status).toBe(200);
+
+  const { status, body } = await findSpeech(spokenDiaryId, SPOKEN_TEXT);
+  expect(status).toBe(200);
+  diarySpeech = body.result;
+  expect(diarySpeech.id).toBe(created.body.result.id);
+  expect(diarySpeech.text).toBe(SPOKEN_TEXT);
+  // Which Diary spoke it: the editor reads this back to know it has audio, and
+  // deleting the Diary later reads it to know what to take with it.
+  expect(diarySpeech.sourceType).toBe("Diary");
+  expect(diarySpeech.sourceId).toBe(spokenDiaryId);
+
+  // A Speech with no file is a player with nothing to play.
+  expect(fs.existsSync(await speechFile(diarySpeech.filename))).toBe(true);
+});
+
+test("has no Speech for a Diary whose text has just been rewritten", async () => {
+  const edited = await updateDiary(spokenDiaryId, { content: REWRITTEN_TEXT });
+  expect(edited.status).toBe(200);
+
+  const { status, body } = await findSpeech(spokenDiaryId, REWRITTEN_TEXT);
+
+  // Not an error, and not the old Speech either: the editor reads this as
+  // "not generated yet" and offers to generate again.
+  expect(status).toBe(200);
+  expect(body.result).toBeNull();
+});
+
+test("leaves the Speech of the text it used to say exactly where it was", async () => {
+  const { body } = await findSpeech(spokenDiaryId, SPOKEN_TEXT);
+
+  // The Audio and the Recordings made against it are still keyed to this file,
+  // so an edit that took it away would empty a learner's practice history.
+  expect(body.result.id).toBe(diarySpeech.id);
+  expect(fs.existsSync(await speechFile(diarySpeech.filename))).toBe(true);
+});
+
+test("hands back the Speech already stored when the same bytes arrive again", async () => {
+  const again = await createSpeech(spokenDiaryId, SPOKEN_TEXT);
+
+  // The same text in the same voice synthesises to the same bytes, and a
+  // Speech is unique by them — so this is a collision rather than a failure,
+  // and undoing an edit costs nothing.
+  expect(again.status).toBe(200);
+  expect(again.body.result.id).toBe(diarySpeech.id);
+
+  // The bytes are written before the collision is noticed, over the path the
+  // stored Speech is already playing from. Arriving again must not empty it.
+  const file = await speechFile(diarySpeech.filename);
+  expect(fs.statSync(file).size).toBe(fs.statSync(SAMPLE_AUDIO).size);
 });
 
 test("reached Hosted Enjoy at no point along the way", async () => {

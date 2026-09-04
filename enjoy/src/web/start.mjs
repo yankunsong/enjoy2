@@ -7,6 +7,7 @@
  */
 import fs from "node:fs";
 import path from "node:path";
+import mime from "mime-types";
 import react from "@vitejs/plugin-react";
 import { createServer } from "vite";
 import {
@@ -81,19 +82,6 @@ console.log(`Local Web Enjoy UI listening on ${ui.resolvedUrls.local[0]}`);
  * to copy.
  */
 function serveAssets() {
-  const types = {
-    ".css": "text/css",
-    ".gif": "image/gif",
-    ".ico": "image/x-icon",
-    ".jpg": "image/jpeg",
-    ".jpeg": "image/jpeg",
-    ".png": "image/png",
-    ".svg": "image/svg+xml",
-    ".ttf": "font/ttf",
-    ".webp": "image/webp",
-    ".woff2": "font/woff2",
-  };
-
   return {
     name: "local-web-enjoy-assets",
     configureServer(server) {
@@ -109,9 +97,11 @@ function serveAssets() {
           return next();
         }
 
+        // The same lookup `library.ts` serves Library files by, so the two
+        // routes cannot disagree about what a `.woff2` or a `.svg` is.
         response.setHeader(
           "Content-Type",
-          types[path.extname(file)] ?? "application/octet-stream"
+          mime.lookup(file) || "application/octet-stream"
         );
         fs.createReadStream(file).pipe(response);
       });

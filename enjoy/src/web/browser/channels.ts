@@ -185,9 +185,12 @@ export const channels: Namespace = {
   decompress: {
     dashboard: invoke("decompress-tasks"),
     onComplete: listen("decompress-task-done"),
-    // The mismatch with `onComplete` above is the preload script's, kept rather
-    // than quietly corrected here: fixing it belongs in both places at once.
     onUpdate: listen("decompress-tasks-update"),
+    // `decompress-tasks-done`, not the `decompress-task-done` `onComplete`
+    // subscribes to: the preload script spells the channel both ways, so its
+    // own `removeAllListeners` clears a channel nothing subscribed to. Kept
+    // rather than quietly corrected — this table's job is to say what preload
+    // says, and fixing it belongs in both places at once.
     removeAllListeners: unlisten("decompress-tasks-update", "decompress-tasks-done"),
   },
 

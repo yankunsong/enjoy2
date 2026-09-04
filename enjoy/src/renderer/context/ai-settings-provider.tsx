@@ -14,6 +14,8 @@ type AISettingsProviderState = {
   setSttEngine?: (name: string) => Promise<void>;
   openai?: LlmProviderType;
   setOpenai?: (config: LlmProviderType) => void;
+  azureSpeech?: AzureSpeechConfigType;
+  setAzureSpeech?: (config: AzureSpeechConfigType) => Promise<void>;
   setGptEngine?: (engine: GptEngineSettingType) => void;
   currentGptEngine?: GptEngineSettingType;
   gptProviders?: typeof GPT_PROVIDERS;
@@ -51,6 +53,9 @@ export const AISettingsProvider = ({
     },
   });
   const [openai, setOpenai] = useState<LlmProviderType>(null);
+  // Assessment's own credentials. Empty until the user fills them in, which is
+  // the state `use-pronunciation-assessments` reports rather than fails on.
+  const [azureSpeech, setAzureSpeech] = useState<AzureSpeechConfigType>(null);
 
   const refreshGptProviders = async () => {
     let providers = GPT_PROVIDERS;
@@ -153,6 +158,13 @@ export const AISettingsProvider = ({
       setOpenai(Object.assign({ name: "openai" }, _openai));
     }
 
+    const _azureSpeech = await EnjoyApp.userSettings.get(
+      UserSettingKeyEnum.AZURE_SPEECH
+    );
+    if (_azureSpeech) {
+      setAzureSpeech(_azureSpeech);
+    }
+
     const _gptEngine = await EnjoyApp.userSettings.get(
       UserSettingKeyEnum.GPT_ENGINE
     );
@@ -187,6 +199,11 @@ export const AISettingsProvider = ({
     refreshTtsConfig();
   };
 
+  const handleSetAzureSpeech = async (config: AzureSpeechConfigType) => {
+    await EnjoyApp.userSettings.set(UserSettingKeyEnum.AZURE_SPEECH, config);
+    setAzureSpeech(config);
+  };
+
   const handleSetOpenai = async (config: LlmProviderType) => {
     await EnjoyApp.userSettings.set(UserSettingKeyEnum.OPENAI, config);
     setOpenai(Object.assign({ name: "openai" }, config));
@@ -214,6 +231,9 @@ export const AISettingsProvider = ({
               }),
         openai,
         setOpenai: (config: LlmProviderType) => handleSetOpenai(config),
+        azureSpeech,
+        setAzureSpeech: (config: AzureSpeechConfigType) =>
+          handleSetAzureSpeech(config),
         sttEngine,
         setSttEngine: (name: SttEngineOptionEnum) => handleSetSttEngine(name),
         ttsConfig,

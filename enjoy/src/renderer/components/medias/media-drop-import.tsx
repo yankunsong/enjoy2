@@ -59,7 +59,13 @@ export const MediaDropImport = () => {
   const importFiles = async (files: File[]) => {
     if (importing) return;
 
-    const media = files.filter((file) => mediaTypeOf(file));
+    // Sorted into what each file is on the way past: the answer decides both
+    // whether the file is a Media at all and which namespace imports it, and
+    // asking twice invites the two answers to drift apart.
+    const media = files.flatMap((file) => {
+      const type = mediaTypeOf(file);
+      return type ? [{ file, type }] : [];
+    });
     if (media.length === 0) {
       return toast.error(t("droppedFileIsNotMedia"));
     }
@@ -98,11 +104,10 @@ export const MediaDropImport = () => {
     }
   };
 
-  const importOne = async (file: File) => {
-    const namespace = MEDIA_NAMESPACES[mediaTypeOf(file)];
+  const importOne = async ({ file, type }: DroppedMedia) => {
     const path = await EnjoyApp.localFile.stage(file);
 
-    return EnjoyApp[namespace].create(path);
+    return EnjoyApp[MEDIA_NAMESPACES[type]].create(path);
   };
 
   if (!dragging && !importing) return null;
@@ -132,7 +137,12 @@ const MEDIA_NAMESPACES = {
   Video: "videos",
 } as const;
 
-const mediaTypeOf = (file: File): keyof typeof MEDIA_NAMESPACES | null => {
+type MediaType = keyof typeof MEDIA_NAMESPACES;
+
+/** A dropped file and what it turned out to be, decided once. */
+type DroppedMedia = { file: File; type: MediaType };
+
+const mediaTypeOf = (file: File): MediaType | null => {
   const extension = file.name.split(".").pop()?.toLowerCase() ?? "";
 
   if (AudioFormats.includes(extension)) return "Audio";

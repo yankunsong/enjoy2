@@ -167,26 +167,33 @@ export const Sidebar = (props: {
               isCollapsed={isCollapsed}
             />
 
-            <SidebarItem
-              href="/documents"
-              label={t("sidebar.documents")}
-              tooltip={t("sidebar.documents")}
-              active={activeTab.startsWith("/documents")}
-              Icon={NewspaperIcon}
-              isCollapsed={isCollapsed}
-            />
+            {/* Ebooks and the AI assistant: neither is part of shadowing, and
+                the assistant needs an engine this distribution has no account
+                for. Routes stay reachable by address, as above. */}
+            {!isLocalWebEnjoy && (
+              <SidebarItem
+                href="/documents"
+                label={t("sidebar.documents")}
+                tooltip={t("sidebar.documents")}
+                active={activeTab.startsWith("/documents")}
+                Icon={NewspaperIcon}
+                isCollapsed={isCollapsed}
+              />
+            )}
 
             <Separator />
 
-            <SidebarItem
-              href="/conversations"
-              label={t("sidebar.aiAssistant")}
-              tooltip={t("sidebar.aiAssistant")}
-              active={activeTab.startsWith("/conversations")}
-              Icon={BotIcon}
-              testid="sidebar-conversations"
-              isCollapsed={isCollapsed}
-            />
+            {!isLocalWebEnjoy && (
+              <SidebarItem
+                href="/conversations"
+                label={t("sidebar.aiAssistant")}
+                tooltip={t("sidebar.aiAssistant")}
+                active={activeTab.startsWith("/conversations")}
+                Icon={BotIcon}
+                testid="sidebar-conversations"
+                isCollapsed={isCollapsed}
+              />
+            )}
 
             <SidebarItem
               href="/pronunciation_assessments"

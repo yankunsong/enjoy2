@@ -37,6 +37,22 @@ export const emit = (channel: string, ...args: unknown[]) => {
   for (const listener of listeners.get(channel) ?? []) listener({}, ...args);
 };
 
+/**
+ * The same three subscriptions, bound to a channel.
+ *
+ * Both halves of the bridge hand these out — the generated one for a `listen`
+ * spec, `electron-only.ts` for the namespaces that have no handler behind them
+ * — and a subscription that behaves differently depending on which half handed
+ * it out would be a difference no caller can see and no caller expects.
+ */
+export const subscribe = (channel: string) => (listener: Listener) =>
+  on(channel, listener);
+
+export const unsubscribeOne = (channel: string) => (listener: Listener) =>
+  off(channel, listener);
+
+export const unsubscribe = (channel: string) => () => offAll(channel);
+
 /** Proxied to the local server by the frontend dev server, as `/ipc` is. */
 const EVENTS_ROUTE = "/events";
 

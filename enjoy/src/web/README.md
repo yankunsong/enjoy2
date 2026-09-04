@@ -106,6 +106,19 @@ writes the 16 kHz WAV Alignment reads. `ffmpeg.compressForUpload` writes a
 crosses OpenAI's 25 MB limit after under seven minutes of stereo, where the
 copy holds over two hours. Neither is spare work for the other.
 
+## Assessment
+
+Phoneme-level scoring runs on the user's own Azure Speech resource, set as a key
+and a region under Preferences → Advanced. Desktop Enjoy asks Hosted Enjoy for a
+short-lived authorization token against an account instead; with a key there is
+no token to fetch, and asking anyway would come back as the empty object
+`fake-web-api.ts` answers with, leaving the failure to surface deep inside the
+Azure SDK. With the boxes empty, Local Web Enjoy says so by name rather than
+trying.
+
+Both credentials are stored as plain JSON in the local database, beside the
+OpenAI key and on the same reasoning: one user, loopback only.
+
 ## Shadowing
 
 Looping a sentence, recording against it and comparing the two waveforms is the
@@ -127,12 +140,13 @@ None of it reaches Hosted Enjoy. The models sync every record they save, and
 
 ## Configuration
 
-Four environment variables steer it, the first two shared with Desktop Enjoy:
+Five environment variables steer it, the first three shared with Desktop Enjoy:
 
 | Variable | Meaning |
 | --- | --- |
 | `SETTINGS_PATH` | Directory holding `settings.json`. |
 | `LIBRARY_PATH` | Where the Library goes. |
+| `WEB_API_URL` | Where Hosted Enjoy would be. Nothing here calls it — `fake-web-api.ts` answers instead — so the tests point it at a local address and assert nothing ever arrives. |
 | `ENJOY_WEB_PORT` | Port for the local server; `0` picks a free one. Defaults to 7100. |
 | `ENJOY_WEB_UI_PORT` | Port for the frontend; `0` picks a free one. Defaults to 7101. |
 

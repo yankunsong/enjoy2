@@ -1,6 +1,11 @@
 import * as sdk from "microsoft-cognitiveservices-speech-sdk";
 import { useContext } from "react";
-import { AppSettingsProviderContext } from "@renderer/context";
+import { t } from "i18next";
+import { isLocalWebEnjoy } from "@/distribution";
+import {
+  AISettingsProviderContext,
+  AppSettingsProviderContext,
+} from "@renderer/context";
 import camelcaseKeys from "camelcase-keys";
 import { map, forEach, sum, filter, cloneDeep } from "lodash";
 import * as Diff from "diff";
@@ -8,6 +13,47 @@ import * as Diff from "diff";
 const THIRTY_SECONDS = 30 * 1000;
 export const usePronunciationAssessments = () => {
   const { webApi, EnjoyApp } = useContext(AppSettingsProviderContext);
+  const { azureSpeech } = useContext(AISettingsProviderContext);
+
+  /**
+   * How the Azure SDK is told who is asking.
+   *
+   * Desktop Enjoy asks Hosted Enjoy for a short-lived authorization token
+   * against an account. With the user's own resource there is no token to
+   * fetch and nothing to ask: the key speaks for itself, and asking Hosted
+   * Enjoy anyway would answer with the empty object `fake-web-api.ts` returns,
+   * leaving `token` and `region` undefined and the failure to surface deep
+   * inside the SDK.
+   */
+  const speechConfig = async (params: {
+    targetId: string;
+    targetType: string;
+  }): Promise<{ config: sdk.SpeechConfig; tokenId?: number }> => {
+    if (azureSpeech?.key && azureSpeech?.region) {
+      return {
+        config: sdk.SpeechConfig.fromSubscription(
+          azureSpeech.key,
+          azureSpeech.region
+        ),
+      };
+    }
+
+    if (isLocalWebEnjoy) {
+      // The one distribution that has no account to fall back on, so say which
+      // two boxes are empty rather than fail somewhere less obvious.
+      throw new Error(t("azureSpeechKeyIsRequired"));
+    }
+
+    const { id, token, region } = await webApi.generateSpeechToken({
+      purpose: "pronunciation_assessment",
+      ...params,
+    });
+
+    return {
+      config: sdk.SpeechConfig.fromAuthorizationToken(token, region),
+      tokenId: id,
+    };
+  };
 
   const createAssessment = async (params: {
     language: string;
@@ -29,15 +75,7 @@ export const usePronunciationAssessments = () => {
 
     const { language, reference = recording.referenceText } = params;
 
-    const {
-      id: tokenId,
-      token,
-      region,
-    } = await webApi.generateSpeechToken({
-      purpose: "pronunciation_assessment",
-      targetId,
-      targetType,
-    });
+    const { config, tokenId } = await speechConfig({ targetId, targetType });
 
     let result = null;
 
@@ -48,7 +86,7 @@ export const usePronunciationAssessments = () => {
           language,
           reference,
         },
-        { token, region }
+        config
       );
     } else {
       result = await continousAssess(
@@ -57,7 +95,7 @@ export const usePronunciationAssessments = () => {
           language,
           reference,
         },
-        { token, region }
+        config
       );
     }
 
@@ -93,14 +131,9 @@ export const usePronunciationAssessments = () => {
       language: string;
       reference?: string;
     },
-    options: {
-      token: string;
-      region: string;
-    }
+    config: sdk.SpeechConfig
   ): Promise<sdk.PronunciationAssessmentResult> => {
     const { blob, language, reference } = params;
-    const { token, region } = options;
-    const config = sdk.SpeechConfig.fromAuthorizationToken(token, region);
     const audioConfig = sdk.AudioConfig.fromWavFileInput(
       new File([blob], "audio.wav")
     );
@@ -161,14 +194,9 @@ export const usePronunciationAssessments = () => {
       language: string;
       reference?: string;
     },
-    options: {
-      token: string;
-      region: string;
-    }
+    config: sdk.SpeechConfig
   ): Promise<sdk.PronunciationAssessmentResult> => {
     const { blob, language, reference } = params;
-    const { token, region } = options;
-    const config = sdk.SpeechConfig.fromAuthorizationToken(token, region);
     const audioConfig = sdk.AudioConfig.fromWavFileInput(
       new File([blob], "audio.wav")
     );

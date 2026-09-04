@@ -89,20 +89,26 @@ export const useTranscribe = () => {
       isolate = false,
       align = true,
     } = params || {};
-    const blob = await (await fetch(url)).blob();
+
+    // Read once, and only if something asks. Alignment and the two engines
+    // that upload the WAV itself all want these bytes, but OpenAI does not —
+    // it uploads `uploadCopy` instead — so fetching eagerly would pull a
+    // fifteen-minute WAV into memory on the one path built to avoid its size.
+    let wav: Promise<Blob> | null = null;
+    const signal = () => (wav ??= fetch(url).then((it) => it.blob()));
 
     let result: any;
 
     if (service === "upload" && originalText) {
       result = await alignText(originalText);
     } else if (service === SttEngineOptionEnum.ENJOY_CLOUDFLARE) {
-      result = await transcribeByCloudflareAi(blob);
+      result = await transcribeByCloudflareAi(await signal());
     } else if (service === SttEngineOptionEnum.OPENAI) {
       result = await transcribeByOpenAi(await uploadCopy(url));
     } else {
       // Azure AI is the default service
       result = await transcribeByAzureAi(
-        new File([blob], "audio.wav", { type: "audio/wav" }),
+        new File([await signal()], "audio.wav", { type: "audio/wav" }),
         language,
         {
           targetId,
@@ -123,7 +129,7 @@ export const useTranscribe = () => {
 
     if (segmentTimeline && segmentTimeline.length > 0) {
       const wordTimeline = await EnjoyApp.echogarden.alignSegments(
-        new Uint8Array(await blob.arrayBuffer()),
+        new Uint8Array(await (await signal()).arrayBuffer()),
         segmentTimeline,
         {
           engine: "dtw",
@@ -147,7 +153,7 @@ export const useTranscribe = () => {
       setOutput("Aligning the transcript...");
       logger.info("Aligning the transcript...");
       const alignmentResult = await EnjoyApp.echogarden.align(
-        new Uint8Array(await blob.arrayBuffer()),
+        new Uint8Array(await (await signal()).arrayBuffer()),
         transcript,
         {
           engine: "dtw",

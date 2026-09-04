@@ -9,12 +9,15 @@
  * Date, a Blob or a File rebuilt from its properties would be worse than one
  * left alone, and neither holds anything either transform is looking for.
  */
-export const walk = <T>(value: T, self: <V>(value: V) => V): T => {
-  if (Array.isArray(value)) return value.map(self) as T;
+export const walk = <T>(value: T, transform: <V>(value: V) => V): T => {
+  if (Array.isArray(value)) return value.map(transform) as T;
 
   if (value?.constructor === Object) {
     return Object.fromEntries(
-      Object.entries(value as object).map(([key, item]) => [key, self(item)])
+      Object.entries(value as object).map(([key, item]) => [
+        key,
+        transform(item),
+      ])
     ) as T;
   }
 

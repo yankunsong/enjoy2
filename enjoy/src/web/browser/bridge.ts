@@ -1,7 +1,7 @@
 import { channels, Namespace, Spec } from "./channels";
 import { electronOnly } from "./electron-only";
 import { localFile } from "./files";
-import { Listener, emit, off, offAll, on } from "./events";
+import { emit, offAll, subscribe, unsubscribeOne } from "./events";
 import { invoke } from "./ipc";
 
 /**
@@ -33,9 +33,9 @@ const implement = (spec: Spec) => {
     case "invoke":
       return (...args: unknown[]) => invoke(spec.channel, args);
     case "listen":
-      return (listener: Listener) => on(spec.channel, listener);
+      return subscribe(spec.channel);
     case "unlistenOne":
-      return (listener: Listener) => off(spec.channel, listener);
+      return unsubscribeOne(spec.channel);
     case "unlisten":
       return () => spec.channels.forEach(offAll);
     case "emit":

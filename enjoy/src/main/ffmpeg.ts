@@ -273,9 +273,14 @@ export default class FfmpegWrapper {
    */
   async compressForUpload(input: string): Promise<string> {
     const filePath = enjoyUrlToPath(input);
+    // Named after the bytes it is made from, the way `transcode` names its own
+    // output: the copy is a pure function of the WAV, so re-transcribing a
+    // Media should land on the same file rather than leave another one behind
+    // for every attempt. Nothing in the Library points at it — it exists to be
+    // uploaded and forgotten — so nothing is orphaned by overwriting it.
     const output = path.join(
       settings.cachePath(),
-      `${path.basename(filePath, path.extname(filePath))}-${Date.now()}.ogg`
+      `${path.basename(filePath, path.extname(filePath))}.upload.ogg`
     );
 
     const ffmpeg = Ffmpeg();

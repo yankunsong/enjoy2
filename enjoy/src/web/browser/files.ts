@@ -1,3 +1,5 @@
+import { unwrap } from "./envelope";
+
 /**
  * Putting a file the browser holds where the local server can read it.
  *
@@ -13,13 +15,9 @@ export const stage = async (file: File): Promise<string> => {
     body: file,
   });
 
-  const body = await response.json();
+  const result = await unwrap(response, () => `Could not stage "${file.name}"`);
 
-  if (!response.ok) {
-    throw new Error(body?.error ?? `Could not stage "${file.name}"`);
-  }
-
-  return body.result.path;
+  return result.path;
 };
 
 /**

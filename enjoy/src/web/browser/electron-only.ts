@@ -1,5 +1,5 @@
 import pkg from "../../../package.json";
-import { Listener, off, offAll, on } from "./events";
+import { subscribe, unsubscribe, unsubscribeOne } from "./events";
 import { stage } from "./files";
 
 /**
@@ -25,15 +25,6 @@ import { stage } from "./files";
  * - **Unavailable**: everything else returns a rejected promise naming the
  *   method, which is how the preload script's own methods report failure.
  */
-
-/** The three categories, as three helpers. */
-const subscribe = (channel: string) => (listener: Listener) =>
-  on(channel, listener);
-
-const unsubscribeOne = (channel: string) => (listener: Listener) =>
-  off(channel, listener);
-
-const unsubscribe = (channel: string) => () => offAll(channel);
 
 /** What `process.platform` would have said, as far as the browser can tell. */
 const platform = () => {

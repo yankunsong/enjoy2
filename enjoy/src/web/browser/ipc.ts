@@ -1,4 +1,5 @@
 import { encodeBinary } from "../binary";
+import { unwrap } from "./envelope";
 import { toBrowserUrls, toEnjoyUrls } from "./media-url";
 
 /**
@@ -23,13 +24,7 @@ export const invoke = async (channel: string, args: unknown[]) => {
     body: JSON.stringify(encodeBinary(toEnjoyUrls(args))),
   });
 
-  const body = await response.json();
+  const result = await unwrap(response, () => `Channel "${channel}" failed`);
 
-  if (!response.ok) {
-    // The server names the channel in its error; keeping that message intact
-    // is the difference between a diagnosable failure and a mystery.
-    throw new Error(body?.error ?? `Channel "${channel}" failed`);
-  }
-
-  return toBrowserUrls(body.result);
+  return toBrowserUrls(result);
 };

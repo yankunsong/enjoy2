@@ -29,6 +29,17 @@ type LlmProviderType = {
   models?: string;
 };
 
+/**
+ * The user's own Azure Speech resource, which is what Assessment runs on under
+ * Local Web Enjoy. Desktop Enjoy asks Hosted Enjoy for a short-lived
+ * authorization token instead; a key and a region are what you have when there
+ * is no account to ask.
+ */
+type AzureSpeechConfigType = {
+  key?: string;
+  region?: string;
+};
+
 type DownloadStateType = {
   name: string;
   isPaused: boolean;

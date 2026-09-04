@@ -1,3 +1,5 @@
+import { walk } from "../traverse";
+
 /**
  * Translates between the two ways a Library file is addressed.
  *
@@ -28,20 +30,5 @@ const rewrite = <T>(value: T, from: string, to: string): T => {
     return (value.startsWith(from) ? to + value.slice(from.length) : value) as T;
   }
 
-  if (Array.isArray(value)) {
-    return value.map((item) => rewrite(item, from, to)) as T;
-  }
-
-  // Plain objects only: a Blob, a File or a Date crossing here would be
-  // rebuilt as a bag of properties.
-  if (value?.constructor === Object) {
-    return Object.fromEntries(
-      Object.entries(value as object).map(([key, item]) => [
-        key,
-        rewrite(item, from, to),
-      ])
-    ) as T;
-  }
-
-  return value;
+  return walk(value, (item) => rewrite(item, from, to));
 };

@@ -1,5 +1,6 @@
 import http from "http";
 import { AddressInfo } from "net";
+import { decodeBinary } from "./binary";
 import { EVENTS_ROUTE, streamEvents } from "./events";
 import { ChannelNotFoundError, ipcMain } from "./fake-electron";
 import { send } from "./json";
@@ -25,7 +26,9 @@ export const IPC_ROUTE = "/ipc/";
  *
  * `POST /files/:name` has no Electron counterpart, because under Electron a
  * dragged file already has a path. It is where the browser puts the bytes of
- * one so that an import can name it.
+ * one so that an import can name it. Bytes that belong to an argument list
+ * rather than to a file of their own travel inside the body instead; see
+ * `binary.ts`.
  */
 export const createServer = () => {
   const server = http.createServer((request, response) => {
@@ -100,7 +103,7 @@ const readArgs = (request: http.IncomingMessage) =>
       if (!body.trim()) return resolve([]);
 
       try {
-        const parsed = JSON.parse(body);
+        const parsed = decodeBinary(JSON.parse(body));
         resolve(Array.isArray(parsed) ? parsed : [parsed]);
       } catch (err) {
         reject(

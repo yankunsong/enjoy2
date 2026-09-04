@@ -30,6 +30,13 @@ Run it with `yarn workspace enjoy web`, which starts both halves:
   which seeking inside a Media re-downloads it, and the content type, without
   which a player has no provider to hand it to.
 - `json.ts` — the one envelope everything above answers in.
+- `binary.ts` — the one thing a JSON argument list cannot carry. A recording
+  made in the browser is bytes and nothing else, and so is the audio Alignment
+  reads; both travel inside the argument list as base64, carrying which kind
+  they are. Both halves of the encoding live here so the wire form cannot
+  drift. See [ADR 0008](../../docs/adr/0008-binary-arguments-travel-inside-the-argument-list.md).
+- `traverse.ts` — the one walk both bridge transforms take through an argument
+  list, since both look for their own thing in the same places.
 - `staging.ts` — where a file dragged into the browser lands so that an import
   can name it. Emptied at startup; see [ADR 0005](../../docs/adr/0005-stage-dropped-files-before-importing.md).
 - `bootstrap.ts` — seeds the local user and the profile record, and registers
@@ -53,13 +60,18 @@ Run it with `yarn workspace enjoy web`, which starts both halves:
   script exposes under Electron.
 - `browser/channels.ts` — the declaration table almost all of it is generated
   from. Keep it in step with `src/preload.ts`.
-- `browser/electron-only.ts` — the five namespaces with no browser counterpart:
-  file dialogs, shell calls, the embedded browser view, application lifecycle,
-  window controls. Each method is mapped, subscribed, or explicitly unavailable —
-  never a silent no-op. `showOpenDialog` is mapped: it opens the browser's own
-  picker and answers in paths, the currency Electron's dialog answers in.
+- `browser/electron-only.ts` — the six namespaces the local server has no
+  handler for: file dialogs, shell calls, the embedded browser view, application
+  lifecycle, window controls, and the system, whose handlers live in the
+  `@main/window` module `fake-window.ts` stands in for. Each method is mapped,
+  subscribed, or explicitly unavailable — never a silent no-op. `showOpenDialog`
+  is mapped: it opens the browser's own picker and answers in paths, the
+  currency Electron's dialog answers in. So is the microphone gate the record
+  button reads: the browser raises that prompt itself, and what is left to
+  answer is whether the permission has been refused outright.
 - `browser/ipc.ts`, `browser/events.ts` — the two things the bridge is made of: a
   call across to the local server, and a subscription to what it pushes back.
+  The call is where an argument's bytes are encoded, alongside its addresses.
   The subscription is one `EventSource` on `/events`, dispatched by the channel
   name the message carries, which is what lets every `onState(callback)`-shaped
   signature survive the move unchanged.
@@ -94,6 +106,25 @@ writes the 16 kHz WAV Alignment reads. `ffmpeg.compressForUpload` writes a
 crosses OpenAI's 25 MB limit after under seven minutes of stereo, where the
 copy holds over two hours. Neither is spare work for the other.
 
+## Shadowing
+
+Looping a sentence, recording against it and comparing the two waveforms is the
+renderer's, unchanged. What Local Web Enjoy adds under it is the bytes: two runs
+of them cross the seam on this path and neither is a file, so both travel inside
+the argument list — the recording the microphone made, and the audio Alignment
+reads to produce the Timeline the sentences are drawn from. Under Electron both
+cross by structured clone; see [ADR 0008](../../docs/adr/0008-binary-arguments-travel-inside-the-argument-list.md)
+for what they cross as here.
+
+The Recording that comes back is a Library address like any other, so the
+waveform under it is drawn from `GET /media/`, byte ranges and all.
+
+The record button's microphone gate is the browser's own — see
+`browser/electron-only.ts`.
+
+None of it reaches Hosted Enjoy. The models sync every record they save, and
+`fake-web-api.ts` is what they sync to.
+
 ## Configuration
 
 Four environment variables steer it, the first two shared with Desktop Enjoy:
@@ -116,6 +147,23 @@ constant you can edit. See [ADR 0003](../../docs/adr/0003-fake-local-user-instea
 `yarn workspace enjoy test:web` runs `e2e/web-server.spec.ts`, which drives the
 local server's HTTP surface. That surface is the only seam this feature is
 tested on; the browser half is judged by hand, by design — see issue #1.
+
+Shadowing is checked on that seam as far as it reaches. The audio the browser
+holds aligns into a Timeline; the bytes it holds arrive as a Recording with a
+duration and a playable address; bytes holding no sound are refused by name
+rather than by dereference; and after a restart the Timeline is still there and
+a new Recording lands in the same Library directory as the old one — one
+directory holding both, which is the assertion the local user id has to survive
+for. Both of those first two go through the bridge's own encoder rather than a
+copy of it, so what is asserted is the wire form that ships.
+
+Hosted Enjoy is checked by pointing every server the suite starts at a local
+address that records what arrives, and asserting nothing ever did.
+
+What the seam cannot reach is the browser, and that half was verified by hand:
+the record button is live — its microphone gate is the browser's own now —
+clicking a sentence in the Timeline loops that sentence alone, and a Recording
+made against it draws its waveform beside the original and plays against it.
 
 The compressed upload copy and the WAV beside it are checked on that seam too,
 on fifteen minutes of stereo — the length that made the limit a real one.
@@ -149,7 +197,7 @@ server answers on a non-loopback address.
 ## Known rough edges
 
 The console carries a running commentary of degraded calls — the system proxy
-settings the app reads at startup have no handler registered here, and every
-Electron-only method that is out of reach names itself when called. That is the
+settings the app reads at startup are out of reach here, and every Electron-only
+method that is out of reach names itself when called. That is the
 trade [ADR 0004](../../docs/adr/0004-electron-only-namespaces-fail-loudly.md)
 makes on purpose.

@@ -7,8 +7,8 @@
  * rather than derived — but it is still a table, not a hand-written function per
  * method. Keep it in step with `src/preload.ts`.
  *
- * The five namespaces with no browser counterpart are not here; they live in
- * `electron-only.ts`.
+ * The namespaces with no main process handler on this side are not here; they
+ * live in `electron-only.ts`.
  */
 
 export type Spec =
@@ -54,17 +54,6 @@ export const channels: Namespace = {
   offLookup: unlisten("on-lookup"),
   onTranslate: listen("on-translate"),
   offTranslate: unlisten("on-translate"),
-
-  system: {
-    preferences: {
-      mediaAccess: invoke("system-preferences-media-access"),
-    },
-    proxy: {
-      get: invoke("system-proxy-get"),
-      set: invoke("system-proxy-set"),
-      refresh: invoke("system-proxy-refresh"),
-    },
-  },
 
   providers: {
     audible: {

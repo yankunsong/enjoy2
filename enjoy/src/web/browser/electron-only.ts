@@ -3,8 +3,11 @@ import { Listener, off, offAll, on } from "./events";
 import { stage } from "./files";
 
 /**
- * The five namespaces with no browser counterpart: file dialogs, shell calls,
- * the embedded browser view, application lifecycle, and window controls.
+ * The six namespaces the local server has no handler for: file dialogs, shell
+ * calls, the embedded browser view, application lifecycle, window controls, and
+ * the system itself. All six are Electron's own — the first five have no
+ * browser counterpart at all, and the sixth lives in `@main/window`, the module
+ * `fake-window.ts` stands in for, so nothing behind it is registered here.
  *
  * Each method falls into one of three categories, and nothing falls outside
  * them — in particular nothing is quietly turned into a no-op, because "I
@@ -136,6 +139,15 @@ export const electronOnly = {
     },
   },
 
+  system: {
+    preferences: { mediaAccess },
+
+    // Electron reads and writes the session's proxy; a Node process has no
+    // session, and the browser's own requests go wherever the browser sends
+    // them. Nothing here can answer, so nothing here pretends to.
+    proxy: unavailable("system.proxy", ["get", "set", "refresh"]),
+  },
+
   dialog: {
     ...unavailable("dialog", [
       "showSaveDialog",
@@ -146,6 +158,31 @@ export const electronOnly = {
     showOpenDialog,
   },
 };
+
+/**
+ * Under Electron this raises the operating system's microphone prompt and
+ * answers whether it was granted. The browser raises that prompt itself, at the
+ * moment the recorder calls for a stream, so the only thing left to answer is
+ * whether calling for one is still worth doing — which is to say whether the
+ * permission has been refused outright.
+ *
+ * Not a no-op dressed as a yes: a denied permission is exactly the state the
+ * record button exists to disable itself for, and it is the answer this
+ * returns.
+ */
+async function mediaAccess(medium: "microphone" | "camera") {
+  try {
+    const status = await navigator.permissions.query({
+      name: medium,
+    } as unknown as PermissionDescriptor);
+
+    return status.state !== "denied";
+  } catch {
+    // Firefox has no permission query for these. There the prompt is the only
+    // answer there has ever been, so leave the button live and let it ask.
+    return true;
+  }
+}
 
 /**
  * The browser's own file picker, answering in the currency Electron's dialog

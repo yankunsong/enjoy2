@@ -1,3 +1,4 @@
+import { encodeBinary } from "../binary";
 import { toBrowserUrls, toEnjoyUrls } from "./media-url";
 
 /**
@@ -6,8 +7,9 @@ import { toBrowserUrls, toEnjoyUrls } from "./media-url";
  * Under Electron the renderer reaches the main process through
  * `ipcRenderer.invoke`; here it reaches the same handlers over HTTP. The
  * argument list and the return value are the ones the handler already speaks,
- * apart from one thing neither side can speak in the other's terms: a Library
- * address, which is rewritten in both directions on the way past.
+ * apart from two things this transport cannot carry as they are: a Library
+ * address, rewritten in both directions on the way past, and an `ArrayBuffer`,
+ * which JSON would render as an empty object.
  */
 
 /**
@@ -18,7 +20,7 @@ export const invoke = async (channel: string, args: unknown[]) => {
   const response = await fetch(`/ipc/${encodeURIComponent(channel)}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(toEnjoyUrls(args)),
+    body: JSON.stringify(encodeBinary(toEnjoyUrls(args))),
   });
 
   const body = await response.json();

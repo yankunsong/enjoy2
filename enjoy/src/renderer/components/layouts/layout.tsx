@@ -4,7 +4,13 @@ import {
   CopilotProviderContext,
 } from "@renderer/context";
 import { useContext, useState } from "react";
-import { CopilotSession, TitleBar, Sidebar } from "@renderer/components";
+import {
+  CopilotSession,
+  MediaDropImport,
+  TitleBar,
+  Sidebar,
+} from "@renderer/components";
+import { isLocalWebEnjoy } from "@/distribution";
 import {
   ResizableHandle,
   ResizablePanel,
@@ -20,6 +26,8 @@ export const Layout = () => {
     return (
       <div className="h-screen flex flex-col">
         <TitleBar />
+        {/* Mounted once, so a dropped file imports from wherever the user is. */}
+        {isLocalWebEnjoy && <MediaDropImport />}
         <ResizablePanelGroup
           direction="horizontal"
           className="flex-1 h-full w-full"

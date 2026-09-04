@@ -154,6 +154,14 @@ type EnjoyAppType = {
     ) => Promise<Electron.MessageBoxReturnValue>;
     showErrorBox: (title: string, content: string) => Promise<void>;
   };
+  /**
+   * Local Web Enjoy only, and undefined under Desktop Enjoy: there, a file
+   * dropped on the window already carries a path. In the browser it carries
+   * bytes, and this is what turns them into a path the main process can read.
+   */
+  localFile?: {
+    stage: (file: File) => Promise<string>;
+  };
   appSettings: {
     get: (key: string) => Promise<any>;
     set: (key: string, value: any) => Promise<void>;

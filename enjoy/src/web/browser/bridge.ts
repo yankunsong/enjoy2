@@ -1,5 +1,6 @@
 import { channels, Namespace, Spec } from "./channels";
 import { electronOnly } from "./electron-only";
+import { localFile } from "./files";
 import { Listener, emit, off, offAll, on } from "./events";
 import { invoke } from "./ipc";
 
@@ -12,6 +13,7 @@ export const installBridge = () => {
   (window as any).__ENJOY_APP__ = {
     ...build(channels),
     ...electronOnly,
+    localFile,
   };
 };
 

@@ -1,10 +1,13 @@
+import { toBrowserUrls, toEnjoyUrls } from "./media-url";
+
 /**
  * The browser end of the one seam: `POST /ipc/:channel` on the local server.
  *
  * Under Electron the renderer reaches the main process through
  * `ipcRenderer.invoke`; here it reaches the same handlers over HTTP. The
  * argument list and the return value are the ones the handler already speaks,
- * so this is a transport swap and nothing more.
+ * apart from one thing neither side can speak in the other's terms: a Library
+ * address, which is rewritten in both directions on the way past.
  */
 
 /**
@@ -15,7 +18,7 @@ export const invoke = async (channel: string, args: unknown[]) => {
   const response = await fetch(`/ipc/${encodeURIComponent(channel)}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(args),
+    body: JSON.stringify(toEnjoyUrls(args)),
   });
 
   const body = await response.json();
@@ -26,5 +29,5 @@ export const invoke = async (channel: string, args: unknown[]) => {
     throw new Error(body?.error ?? `Channel "${channel}" failed`);
   }
 
-  return body.result;
+  return toBrowserUrls(body.result);
 };

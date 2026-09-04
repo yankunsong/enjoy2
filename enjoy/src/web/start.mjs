@@ -14,6 +14,7 @@ import {
   WEB_DIR,
   sharedAliases,
   startLocalServer,
+  webApiAlias,
 } from "./local.mjs";
 
 const DEFAULT_UI_PORT = 7101;
@@ -31,12 +32,7 @@ const ui = await createServer({
   resolve: {
     preserveSymlinks: true,
     alias: [
-      // The third stand-in, and the only one on the browser side: Hosted
-      // Enjoy's client, which this distribution has no account for.
-      {
-        find: /^@\/api$/,
-        replacement: path.join(WEB_DIR, "browser/fake-web-api.ts"),
-      },
+      ...webApiAlias(),
       {
         find: "vendor/pdfjs",
         replacement: path.join(
@@ -60,10 +56,11 @@ const ui = await createServer({
     // The renderer lives outside this root; only the workspace is readable.
     fs: { allow: [PROJECT_ROOT] },
     // Trailing slashes: without them these prefixes would also swallow the
-    // bridge's own `ipc.ts`, which sits one directory away.
+    // bridge's own `ipc.ts` and `files.ts`, which sit one directory away.
     proxy: {
       "/ipc/": { target: local.url },
       "/media/": { target: local.url },
+      "/files/": { target: local.url },
     },
   },
 });

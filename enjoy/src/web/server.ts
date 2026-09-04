@@ -1,7 +1,9 @@
 import http from "http";
 import { AddressInfo } from "net";
 import { ChannelNotFoundError, ipcMain } from "./fake-electron";
+import { send } from "./json";
 import { MEDIA_ROUTE, serveLibraryFile } from "./library";
+import { STAGING_ROUTE, stageFile } from "./staging";
 
 export const DEFAULT_PORT = 7100;
 
@@ -12,11 +14,14 @@ export const IPC_ROUTE = "/ipc/";
  *
  * `POST /ipc/:channel` reproduces Electron's `invoke`: the body is the argument
  * list the renderer would have passed, the response is what the handler
- * returned. Envelope shape is `{ result }` on success and `{ error }` on
- * failure, so a handler returning `undefined` still reads as a success.
+ * returned.
  *
  * `GET /media/...` reproduces the `enjoy://` protocol, which is the other thing
  * the renderer needs from its host.
+ *
+ * `POST /files/:name` has no Electron counterpart, because under Electron a
+ * dragged file already has a path. It is where the browser puts the bytes of
+ * one so that an import can name it.
  */
 export const createServer = () => {
   const server = http.createServer((request, response) => {
@@ -54,6 +59,10 @@ const handle = async (
 
   if (request.method === "GET" && url.pathname.startsWith(MEDIA_ROUTE)) {
     return serveLibraryFile(url.pathname, request, response);
+  }
+
+  if (request.method === "POST" && url.pathname.startsWith(STAGING_ROUTE)) {
+    return stageFile(url.pathname, request, response);
   }
 
   if (request.method === "POST" && url.pathname.startsWith(IPC_ROUTE)) {
@@ -99,7 +108,3 @@ const readArgs = (request: http.IncomingMessage) =>
 const messageOf = (err: unknown) =>
   err instanceof Error ? err.message : String(err);
 
-const send = (response: http.ServerResponse, status: number, body: unknown) => {
-  response.writeHead(status, { "Content-Type": "application/json" });
-  response.end(JSON.stringify(body));
-};

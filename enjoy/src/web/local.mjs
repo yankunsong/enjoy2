@@ -30,6 +30,15 @@ export const sharedAliases = () => [
   { find: "@", replacement: path.join(PROJECT_ROOT, "src") },
 ];
 
+/**
+ * The stand-in both hosts swap in for Hosted Enjoy's client. The renderer reads
+ * it for the pages that still compile; the main process models reach for it on
+ * every save, to sync a record to an account this distribution does not have.
+ */
+export const webApiAlias = () => [
+  { find: /^@\/api$/, replacement: path.join(WEB_DIR, "fake-web-api.ts") },
+];
+
 export const startLocalServer = async () => {
   const vite = await createServer({
     root: PROJECT_ROOT,
@@ -53,6 +62,7 @@ export const startLocalServer = async () => {
           replacement: path.join(WEB_DIR, "fake-window.ts"),
         },
         { find: "@main", replacement: path.join(PROJECT_ROOT, "src/main") },
+        ...webApiAlias(),
         ...sharedAliases(),
       ],
     },

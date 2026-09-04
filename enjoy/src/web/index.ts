@@ -1,6 +1,7 @@
 import db from "@main/db";
 import { bootstrap, seedLocalProfile } from "./bootstrap";
 import { createServer, DEFAULT_PORT } from "./server";
+import { clearStaging } from "./staging";
 
 /**
  * Entry point of the local server. Loaded by `start.mjs`, which is what
@@ -13,6 +14,7 @@ export const start = async () => {
   // user seeded and no profile record yet — the one order that has to hold.
   await db.connect();
   await seedLocalProfile();
+  await clearStaging();
 
   const server = createServer();
   const port = Number(process.env.ENJOY_WEB_PORT ?? DEFAULT_PORT);

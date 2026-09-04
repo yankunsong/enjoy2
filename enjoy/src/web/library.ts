@@ -1,7 +1,9 @@
 import fs from "fs-extra";
 import http from "http";
+import mime from "mime-types";
 import path from "path";
 import settings from "@main/settings";
+import { send } from "./json";
 
 /**
  * Serves Library files over HTTP, the way Desktop Enjoy serves them through its
@@ -31,20 +33,22 @@ export const serveLibraryFile = async (
   const file = resolve(decodeURIComponent(pathname).slice(MEDIA_ROUTE.length));
 
   if (!file || !(await fs.pathExists(file))) {
-    response.writeHead(404, { "Content-Type": "application/json" });
-    return response.end(
-      JSON.stringify({ error: `No file in the Library at ${pathname}` })
-    );
+    return send(response, 404, {
+      error: `No file in the Library at ${pathname}`,
+    });
   }
 
   const { size } = await fs.stat(file);
   const range = parseRange(request.headers.range, size);
+  // A media element picks its provider from the content type, so a Media served
+  // as octet-stream is unplayable however correct its bytes are.
+  const type = mime.lookup(file) || "application/octet-stream";
 
   // Media elements seek by asking for a byte range; answering the whole file
   // regardless would make the shadowing loop re-download on every jump.
   if (range) {
     response.writeHead(206, {
-      "Content-Type": "application/octet-stream",
+      "Content-Type": type,
       "Content-Range": `bytes ${range.start}-${range.end}/${size}`,
       "Accept-Ranges": "bytes",
       "Content-Length": range.end - range.start + 1,
@@ -53,7 +57,7 @@ export const serveLibraryFile = async (
   }
 
   response.writeHead(200, {
-    "Content-Type": "application/octet-stream",
+    "Content-Type": type,
     "Accept-Ranges": "bytes",
     "Content-Length": size,
   });

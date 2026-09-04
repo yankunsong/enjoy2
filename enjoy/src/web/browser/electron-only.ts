@@ -1,5 +1,6 @@
 import pkg from "../../../package.json";
 import { Listener, off, offAll, on } from "./events";
+import { stage } from "./files";
 
 /**
  * The five namespaces with no browser counterpart: file dialogs, shell calls,
@@ -135,10 +136,65 @@ export const electronOnly = {
     },
   },
 
-  dialog: unavailable("dialog", [
-    "showOpenDialog",
-    "showSaveDialog",
-    "showMessageBox",
-    "showErrorBox",
-  ]),
+  dialog: {
+    ...unavailable("dialog", [
+      "showSaveDialog",
+      "showMessageBox",
+      "showErrorBox",
+    ]),
+
+    showOpenDialog,
+  },
 };
+
+/**
+ * The browser's own file picker, answering in the currency Electron's dialog
+ * answers in: paths on the machine running the local server. Picking a file
+ * there means sending its bytes across, so that is what this does.
+ *
+ * Picking a *directory* has no such answer — there is nothing to send, and a
+ * path the browser never learns cannot be invented — so it stays unavailable.
+ */
+async function showOpenDialog(options: Electron.OpenDialogOptions) {
+  const { properties = [], filters = [] } = options ?? {};
+
+  if (properties.includes("openDirectory")) {
+    throw new Error(
+      "EnjoyApp.dialog.showOpenDialog() cannot choose a directory in Local Web Enjoy"
+    );
+  }
+
+  const input = document.createElement("input");
+  input.type = "file";
+  input.multiple = properties.includes("multiSelections");
+
+  const extensions = filters
+    .flatMap((filter) => filter.extensions ?? [])
+    .filter((extension) => extension !== "*");
+  if (extensions.length) {
+    input.accept = extensions.map((extension) => `.${extension}`).join(",");
+  }
+
+  const files = await pick(input);
+  // Electron says "cancelled" by answering with nothing; every call site reads
+  // it that way.
+  if (!files.length) return undefined;
+
+  return Promise.all(files.map(stage));
+}
+
+const pick = (input: HTMLInputElement) =>
+  new Promise<File[]>((resolve) => {
+    const done = () => {
+      input.remove();
+      resolve(Array.from(input.files ?? []));
+    };
+
+    input.addEventListener("change", done, { once: true });
+    input.addEventListener("cancel", done, { once: true });
+
+    // Firefox only fires the picker for an input in the document.
+    input.style.display = "none";
+    document.body.appendChild(input);
+    input.click();
+  });

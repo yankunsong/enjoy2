@@ -156,13 +156,6 @@ export class UserSetting extends Model<UserSetting> {
       }
     }
 
-    // Whisper
-    const whisper = await UserSetting.get(UserSettingKeyEnum.WHISPER);
-    const prevWhisper = await settings.get("whisper.model");
-    if (prevWhisper && !whisper) {
-      UserSetting.set(UserSettingKeyEnum.WHISPER, prevWhisper as string);
-    }
-
     // Profile
     const profile = await UserSetting.get(UserSettingKeyEnum.PROFILE);
     const prevProfile = (await settings.get("user")) as UserType;

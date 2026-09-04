@@ -36,6 +36,5 @@ export * from "./recorder-settings";
 export * from "./vocabulary-settings";
 export * from "./dict-settings";
 
-export * from "./echogarden-stt-settings";
 
 export * from "./deposit";

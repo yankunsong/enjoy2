@@ -5,7 +5,7 @@ import {
 import OpenAI from "openai";
 import { useContext, useState } from "react";
 import { t } from "i18next";
-import { AI_WORKER_ENDPOINT } from "@/constants";
+import { AI_WORKER_ENDPOINT, OPENAI_TRANSCRIBE_TIMEOUT } from "@/constants";
 import * as sdk from "microsoft-cognitiveservices-speech-sdk";
 import axios from "axios";
 import { useAiCommand } from "./use-ai-command";
@@ -16,7 +16,6 @@ import {
 } from "echogarden/dist/utilities/Timeline";
 import { type ParsedCaptionsResult, parseText } from "media-captions";
 import { SttEngineOptionEnum } from "@/types/enums";
-import { RecognitionResult } from "echogarden/dist/api/API.js";
 import take from "lodash/take";
 import sortedUniqBy from "lodash/sortedUniqBy";
 import log from "electron-log/renderer";
@@ -29,7 +28,7 @@ const punctuationsPattern = /\w[.,!?](\s|$)/g;
 
 export const useTranscribe = () => {
   const { EnjoyApp, user, webApi } = useContext(AppSettingsProviderContext);
-  const { openai, echogardenSttConfig } = useContext(AISettingsProviderContext);
+  const { openai } = useContext(AISettingsProviderContext);
   const { punctuateText } = useAiCommand();
   const [output, setOutput] = useState<string>("");
 
@@ -43,6 +42,21 @@ export const useTranscribe = () => {
 
     const output = await EnjoyApp.echogarden.transcode(src);
     return output;
+  };
+
+  /**
+   * The copy Transcription uploads, made from the WAV `transcode` returns.
+   *
+   * The two are not redundant: Alignment reads the WAV's signal, while this one
+   * only has to reach OpenAI, whose 25 MB limit an uncompressed 16 kHz WAV
+   * passes after a few minutes of stereo. Named and typed after the bytes it
+   * actually holds, so the request describes itself honestly.
+   */
+  const uploadCopy = async (wavUrl: string): Promise<File> => {
+    const src = await EnjoyApp.ffmpeg.compressForUpload(wavUrl);
+    const blob = await (await fetch(src)).blob();
+
+    return new File([blob], src.split("/").pop(), { type: "audio/ogg" });
   };
 
   const transcribe = async (
@@ -81,16 +95,10 @@ export const useTranscribe = () => {
 
     if (service === "upload" && originalText) {
       result = await alignText(originalText);
-    } else if (service === SttEngineOptionEnum.LOCAL) {
-      result = await transcribeByLocal(url, {
-        language,
-      });
     } else if (service === SttEngineOptionEnum.ENJOY_CLOUDFLARE) {
       result = await transcribeByCloudflareAi(blob);
     } else if (service === SttEngineOptionEnum.OPENAI) {
-      result = await transcribeByOpenAi(
-        new File([blob], "audio.mp3", { type: "audio/mp3" })
-      );
+      result = await transcribeByOpenAi(await uploadCopy(url));
     } else {
       // Azure AI is the default service
       result = await transcribeByAzureAi(
@@ -235,47 +243,6 @@ export const useTranscribe = () => {
     }
   };
 
-  const transcribeByLocal = async (
-    url: string,
-    options: { language: string }
-  ): Promise<{
-    engine: string;
-    model: string;
-    transcript: string;
-    segmentTimeline: TimelineEntry[];
-  }> => {
-    let { language } = options || {};
-    const languageCode = language.split("-")[0];
-    let model: string;
-
-    let res: RecognitionResult;
-    logger.info("Start transcribing from Whisper...");
-    try {
-      model =
-        echogardenSttConfig[
-          echogardenSttConfig.engine.replace(".cpp", "Cpp") as
-            | "whisper"
-            | "whisperCpp"
-        ].model;
-      res = await EnjoyApp.echogarden.recognize(url, {
-        language: languageCode,
-        ...echogardenSttConfig,
-      });
-    } catch (err) {
-      throw new Error(t("whisperTranscribeFailed", { error: err.message }));
-    }
-
-    setOutput("Whisper transcribe done");
-    const { transcript, timeline } = res;
-
-    return {
-      engine: "whisper",
-      model,
-      transcript,
-      segmentTimeline: timeline,
-    };
-  };
-
   const transcribeByOpenAi = async (
     file: File
   ): Promise<{
@@ -293,6 +260,9 @@ export const useTranscribe = () => {
       baseURL: openai.baseUrl,
       dangerouslyAllowBrowser: true,
       maxRetries: 0,
+      // A long Media is a long upload, and the default leaves one hanging with
+      // nothing to report; this puts a nameable end on it.
+      timeout: OPENAI_TRANSCRIBE_TIMEOUT,
     });
 
     setOutput("Transcribing from OpenAI...");

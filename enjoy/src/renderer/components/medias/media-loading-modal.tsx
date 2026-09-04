@@ -43,7 +43,6 @@ const LoadingContent = () => {
     decodeError,
     transcription,
     transcribing,
-    transcribingProgress,
     transcribingOutput,
     generateTranscription,
     onCancel,
@@ -72,7 +71,6 @@ const LoadingContent = () => {
               }}
               onCancel={onCancel}
               transcribing={transcribing}
-              transcribingProgress={transcribingProgress}
               transcribingOutput={transcribingOutput}
             />
           </TabsContent>

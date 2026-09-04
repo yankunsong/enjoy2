@@ -19,7 +19,6 @@ export const useTranscriptions = (media: AudioType | VideoType) => {
   const { addDblistener, removeDbListener } = useContext(DbProviderContext);
   const [transcription, setTranscription] = useState<TranscriptionType>(null);
   const { transcribe, output } = useTranscribe();
-  const [transcribingProgress, setTranscribingProgress] = useState<number>(0);
   const [transcribing, setTranscribing] = useState<boolean>(false);
   const [creating, setCreating] = useState<boolean>(false);
   const [transcribingOutput, setTranscribingOutput] = useState<string>("");
@@ -124,7 +123,6 @@ export const useTranscriptions = (media: AudioType | VideoType) => {
     } = params || {};
     setService(service);
     setTranscribing(true);
-    setTranscribingProgress(0);
 
     try {
       if (originalText === undefined) {
@@ -316,7 +314,6 @@ export const useTranscriptions = (media: AudioType | VideoType) => {
 
   return {
     transcription,
-    transcribingProgress,
     transcribing,
     transcribingOutput: output || transcribingOutput,
     generateTranscription,

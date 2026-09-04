@@ -19,7 +19,6 @@ import {
   FormMessage,
   Input,
   PingPoint,
-  Progress,
   Select,
   SelectContent,
   SelectItem,
@@ -48,21 +47,17 @@ export const TranscriptionCreateForm = (props: {
   originalText?: string;
   onCancel?: () => void;
   transcribing: boolean;
-  transcribingProgress: number;
   transcribingOutput: string;
 }) => {
   const {
     transcribing = false,
-    transcribingProgress = 0,
     transcribingOutput,
     onSubmit,
     onCancel,
     originalText,
   } = props;
   const { learningLanguage } = useContext(AppSettingsProviderContext);
-  const { sttEngine, echogardenSttConfig } = useContext(
-    AISettingsProviderContext
-  );
+  const { sttEngine } = useContext(AISettingsProviderContext);
 
   const form = useForm<z.infer<typeof transcriptionSchema>>({
     resolver: zodResolver(transcriptionSchema),
@@ -168,9 +163,6 @@ export const TranscriptionCreateForm = (props: {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value={SttEngineOptionEnum.LOCAL}>
-                    {t("local")}
-                  </SelectItem>
                   <SelectItem value={SttEngineOptionEnum.ENJOY_AZURE}>
                     {t("enjoyAzure")}
                   </SelectItem>
@@ -184,24 +176,6 @@ export const TranscriptionCreateForm = (props: {
                 </SelectContent>
               </Select>
               <FormDescription>
-                {form.watch("service") === SttEngineOptionEnum.LOCAL &&
-                  echogardenSttConfig && (
-                    <>
-                      <div>{t("localSpeechToTextDescription")}</div>
-                      <div>
-                        * {t("model")}: {echogardenSttConfig.engine} /{" "}
-                        {
-                          echogardenSttConfig[
-                            echogardenSttConfig.engine?.replace(
-                              ".cpp",
-                              "Cpp"
-                            ) as "whisper" | "whisperCpp"
-                          ]?.model
-                        }
-                      </div>
-                    </>
-                  )}
-
                 {form.watch("service") === SttEngineOptionEnum.ENJOY_AZURE &&
                   t("enjoyAzureSpeechToTextDescription")}
                 {form.watch("service") ===
@@ -339,9 +313,7 @@ export const TranscriptionCreateForm = (props: {
         </Collapsible>
 
         <TranscribeProgress
-          service={form.watch("service")}
           transcribing={transcribing}
-          transcribingProgress={transcribingProgress}
           transcribingOutput={transcribingOutput}
         />
 
@@ -367,13 +339,10 @@ export const TranscriptionCreateForm = (props: {
 };
 
 const TranscribeProgress = (props: {
-  service: string;
   transcribing: boolean;
-  transcribingProgress: number;
   transcribingOutput?: string;
 }) => {
-  const { service, transcribing, transcribingProgress, transcribingOutput } =
-    props;
+  const { transcribing, transcribingOutput } = props;
   if (!transcribing) return null;
 
   return (
@@ -382,9 +351,6 @@ const TranscribeProgress = (props: {
         <PingPoint colorClassName="bg-yellow-500" />
         <span>{t("transcribing")}</span>
       </div>
-      {service === "local" && transcribingProgress > 0 && (
-        <Progress value={transcribingProgress} />
-      )}
       {transcribingOutput && (
         <div className="max-w-full rounded-lg border bg-zinc-950 p-3 dark:bg-zinc-900 h-20 overflow-y-auto">
           <code className="px-[0.3rem] py-[0.2rem] rounded text-muted-foreground font-mono text-xs break-words">

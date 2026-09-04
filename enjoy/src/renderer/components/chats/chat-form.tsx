@@ -269,9 +269,6 @@ export const ChatForm = (props: { chat: ChatType; onFinish?: () => void }) => {
                           />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value={SttEngineOptionEnum.LOCAL}>
-                            {t("local")}
-                          </SelectItem>
                           <SelectItem value={SttEngineOptionEnum.ENJOY_AZURE}>
                             {t("enjoyAzure")}
                           </SelectItem>
@@ -289,9 +286,6 @@ export const ChatForm = (props: { chat: ChatType; onFinish?: () => void }) => {
                         {t("models.chat.sttAiServiceDescription")}
                       </FormDescription>
                       <FormDescription>
-                        {form.watch("config.sttEngine") ===
-                          SttEngineOptionEnum.LOCAL &&
-                          t("localSpeechToTextDescription")}
                         {form.watch("config.sttEngine") ===
                           SttEngineOptionEnum.ENJOY_AZURE &&
                           t("enjoyAzureSpeechToTextDescription")}

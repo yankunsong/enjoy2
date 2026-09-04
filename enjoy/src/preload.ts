@@ -3,10 +3,7 @@
 import { contextBridge, ipcRenderer, IpcRendererEvent } from "electron";
 import { version } from "../package.json";
 import { Timeline } from "echogarden/dist/utilities/Timeline";
-import {
-  type AlignmentOptions,
-  type RecognitionOptions,
-} from "echogarden/dist/api/API";
+import { type AlignmentOptions } from "echogarden/dist/api/API";
 
 contextBridge.exposeInMainWorld("__ENJOY_APP__", {
   app: {
@@ -550,12 +547,6 @@ contextBridge.exposeInMainWorld("__ENJOY_APP__", {
     },
   },
   echogarden: {
-    getPackagesDir: () => {
-      return ipcRenderer.invoke("echogarden-get-packages-dir");
-    },
-    recognize: (input: string, options: RecognitionOptions) => {
-      return ipcRenderer.invoke("echogarden-recognize", input, options);
-    },
     align: (input: string, transcript: string, options: any) => {
       return ipcRenderer.invoke("echogarden-align", input, transcript, options);
     },
@@ -582,9 +573,6 @@ contextBridge.exposeInMainWorld("__ENJOY_APP__", {
     transcode: (input: string) => {
       return ipcRenderer.invoke("echogarden-transcode", input);
     },
-    check: (options: RecognitionOptions) => {
-      return ipcRenderer.invoke("echogarden-check", options);
-    },
     checkAlign: (options: AlignmentOptions) => {
       return ipcRenderer.invoke("echogarden-check-align", options);
     },
@@ -595,6 +583,9 @@ contextBridge.exposeInMainWorld("__ENJOY_APP__", {
     },
     transcode: (input: string, output: string, options: string[]) => {
       return ipcRenderer.invoke("ffmpeg-transcode", input, output, options);
+    },
+    compressForUpload: (input: string) => {
+      return ipcRenderer.invoke("ffmpeg-compress-for-upload", input);
     },
   },
   decompress: {

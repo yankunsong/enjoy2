@@ -30,7 +30,6 @@ export const MediaTranscriptionGenerateButton = (props: {
     generateTranscription,
     transcribing,
     transcription,
-    transcribingProgress,
     transcribingOutput,
   } = useContext(MediaShadowProviderContext);
   const [open, setOpen] = useState(false);
@@ -91,7 +90,6 @@ export const MediaTranscriptionGenerateButton = (props: {
               }}
               originalText=""
               transcribing={transcribing}
-              transcribingProgress={transcribingProgress}
               transcribingOutput={transcribingOutput}
             />
           </TabsContent>

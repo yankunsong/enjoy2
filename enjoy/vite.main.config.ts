@@ -36,14 +36,6 @@ export default defineConfig((env) => {
     },
   ];
 
-  if (os.platform() === "darwin") {
-    staticCopyTargets.push({
-      src: `lib/whisper.cpp/${
-        process.env.PACKAGE_OS_ARCH || os.arch()
-      }/${os.platform()}/*`,
-      dest: "lib/whisper",
-    });
-  }
   const config: UserConfig = {
     build: {
       sourcemap: true,

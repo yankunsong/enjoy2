@@ -21,13 +21,42 @@ const SAMPLE_VIDEO = path.join(process.cwd(), "test-results", "sample.mp4");
 const stagingDir = () =>
   path.join(resultDir, LIBRARY_PATH_SUFFIX, "cache", "staging");
 
+// A long stereo Media, the shape the upload limit is actually hit by. Fifteen
+// minutes of it as an uncompressed 16 kHz stereo WAV is far past OpenAI's
+// 25 MB; the fixture itself stays small because it ships compressed.
+const SAMPLE_LONG_STEREO = path.join(
+  process.cwd(),
+  "test-results",
+  "long-stereo.mp3"
+);
+
+const OPENAI_UPLOAD_LIMIT = 25 * 1024 * 1024;
+
+const ffmpegPath = () =>
+  createRequire(import.meta.url)("ffmpeg-static") as string;
+
+const buildSampleLongStereo = () => {
+  if (fs.existsSync(SAMPLE_LONG_STEREO)) return;
+
+  fs.ensureDirSync(path.dirname(SAMPLE_LONG_STEREO));
+  execFileSync(
+    ffmpegPath(),
+    [
+      // prettier-ignore
+      "-f", "lavfi", "-i", "sine=frequency=440:duration=900",
+      "-ac", "2", "-ar", "44100", "-b:a", "128k",
+      "-y", SAMPLE_LONG_STEREO,
+    ],
+    { stdio: "ignore" }
+  );
+};
+
 const buildSampleVideo = () => {
   if (fs.existsSync(SAMPLE_VIDEO)) return;
 
   fs.ensureDirSync(path.dirname(SAMPLE_VIDEO));
-  const ffmpeg = createRequire(import.meta.url)("ffmpeg-static") as string;
   execFileSync(
-    ffmpeg,
+    ffmpegPath(),
     [
       // prettier-ignore
       "-f", "lavfi", "-i", "testsrc=duration=1:size=64x64:rate=10",
@@ -95,6 +124,7 @@ test.beforeAll(async () => {
   fs.removeSync(resultDir);
   fs.ensureDirSync(resultDir);
   buildSampleVideo();
+  buildSampleLongStereo();
 
   const started = await startServer(resultDir);
   server = started.child;
@@ -397,4 +427,58 @@ test("keeps pushing to a subscriber that reconnected", async () => {
   } finally {
     events.close();
   }
+});
+
+/**
+ * Transcoding for Transcription. Two products come out of one Media and both
+ * are needed: the WAV Alignment reads the signal of, and the compressed copy
+ * Transcription uploads.
+ */
+
+const libraryFile = (enjoyUrl: string) =>
+  path.join(
+    resultDir,
+    LIBRARY_PATH_SUFFIX,
+    enjoyUrl.replace("enjoy://library/", "")
+  );
+
+test("compresses a long Media small enough to upload, leaving the WAV alone", async () => {
+  test.setTimeout(300000);
+
+  const wavUrl = (await ipc("echogarden-transcode", SAMPLE_LONG_STEREO)).body
+    .result;
+  const wav = libraryFile(wavUrl);
+  const before = fs.statSync(wav);
+
+  // The reason the compressed copy exists at all: fifteen minutes of stereo
+  // comes out of here already past the limit.
+  expect(before.size).toBeGreaterThan(OPENAI_UPLOAD_LIMIT);
+
+  const { status, body } = await ipc("ffmpeg-compress-for-upload", wavUrl);
+  expect(status).toBe(200);
+
+  const copy = libraryFile(body.result);
+  expect(fs.statSync(copy).size).toBeLessThan(OPENAI_UPLOAD_LIMIT);
+
+  // Alignment still has the signal it was given; the copy is a second product,
+  // not a replacement.
+  expect(fs.statSync(wav)).toMatchObject({
+    size: before.size,
+    mtimeMs: before.mtimeMs,
+  });
+});
+
+test("serves the upload copy under a type that matches its bytes", async () => {
+  test.setTimeout(300000);
+
+  const { body } = await ipc("ffmpeg-compress-for-upload", SAMPLE_LONG_STEREO);
+
+  // The renderer names the upload from this address, so a lie here is a lie in
+  // the request OpenAI rejects.
+  expect(body.result).toMatch(/\.ogg$/);
+  const served = await fetch(
+    `${baseUrl}/media/${body.result.replace("enjoy://", "")}`
+  );
+  expect(served.status).toBe(200);
+  expect(served.headers.get("content-type")).toBe("audio/ogg");
 });

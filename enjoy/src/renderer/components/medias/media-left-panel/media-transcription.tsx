@@ -44,7 +44,6 @@ export const MediaTranscription = (props: { display?: boolean }) => {
     setCurrentSegmentIndex,
     transcription,
     transcribing,
-    transcribingProgress,
   } = useContext(MediaShadowProviderContext);
   const { EnjoyApp } = useContext(AppSettingsProviderContext);
   const { addDblistener, removeDbListener } = useContext(DbProviderContext);
@@ -125,12 +124,7 @@ export const MediaTranscription = (props: { display?: boolean }) => {
         <div className="flex items-cener justify-between">
           <div className="flex items-center space-x-2">
             {transcribing || transcription.state === "processing" ? (
-              <>
-                <PingPoint colorClassName="bg-yellow-500" />
-                <div className="text-sm">
-                  {transcribingProgress > 0 && `${transcribingProgress}%`}
-                </div>
-              </>
+              <PingPoint colorClassName="bg-yellow-500" />
             ) : transcription.state === "finished" ? (
               <CheckCircleIcon className="text-green-500 w-4 h-4" />
             ) : (

@@ -3,7 +3,6 @@ export enum UserSettingKeyEnum {
   LANGUAGE = "language",
   NATIVE_LANGUAGE = "native_language",
   LEARNING_LANGUAGE = "learning_language",
-  WHISPER = "whisper",
   OPENAI = "openai",
   HOTKEYS = "hotkeys",
   GPT_ENGINE = "gpt_engine",
@@ -12,11 +11,9 @@ export enum UserSettingKeyEnum {
   VOCABULARY = "vocabulary",
   DICTS = "dicts",
   RECORDER = "recorder",
-  ECHOGARDEN = "echogarden",
 }
 
 export enum SttEngineOptionEnum {
-  LOCAL = "local",
   ENJOY_AZURE = "enjoy_azure",
   ENJOY_CLOUDFLARE = "enjoy_cloudflare",
   OPENAI = "openai",

@@ -5,7 +5,6 @@ import {
 } from "@renderer/context";
 import { SttEngineOptionEnum, UserSettingKeyEnum } from "@/types/enums";
 import { GPT_PROVIDERS, TTS_PROVIDERS } from "@renderer/components";
-import { WHISPER_MODELS } from "@/constants";
 import log from "electron-log/renderer";
 
 const logger = log.scope("ai-settings-provider.tsx");
@@ -21,8 +20,6 @@ type AISettingsProviderState = {
   ttsProviders?: typeof TTS_PROVIDERS;
   ttsConfig?: TtsConfigType;
   setTtsConfig?: (config: TtsConfigType) => Promise<void>;
-  echogardenSttConfig?: EchogardenSttConfigType;
-  setEchogardenSttConfig?: (config: EchogardenSttConfigType) => Promise<void>;
 };
 
 const initialState: AISettingsProviderState = {};
@@ -41,12 +38,12 @@ export const AISettingsProvider = ({
   const [ttsProviders, setTtsProviders] = useState<any>(TTS_PROVIDERS);
   const db = useContext(DbProviderContext);
 
+  // OpenAI, so that Transcription runs on the user's own key rather than on a
+  // token Hosted Enjoy hands out to an account.
   const [sttEngine, setSttEngine] = useState<SttEngineOptionEnum>(
-    SttEngineOptionEnum.ENJOY_AZURE
+    SttEngineOptionEnum.OPENAI
   );
   const [ttsConfig, setTtsConfig] = useState<TtsConfigType>(null);
-  const [echogardenSttConfig, setEchogardenSttConfig] =
-    useState<EchogardenSttConfigType>(null);
   const [gptEngine, setGptEngine] = useState<GptEngineSettingType>({
     name: "enjoyai",
     models: {
@@ -116,61 +113,6 @@ export const AISettingsProvider = ({
       });
   };
 
-  const refreshEchogardenSttConfig = async () => {
-    let config = await EnjoyApp.userSettings.get(UserSettingKeyEnum.ECHOGARDEN);
-
-    if (!config) {
-      let model = "tiny";
-      const whisperModel =
-        (await EnjoyApp.userSettings.get(UserSettingKeyEnum.WHISPER)) || "";
-      if (WHISPER_MODELS.includes(whisperModel)) {
-        model = whisperModel;
-      } else {
-        if (whisperModel.match(/tiny/)) {
-          model = "tiny";
-        } else if (whisperModel.match(/base/)) {
-          model = "base";
-        } else if (whisperModel.match(/small/)) {
-          model = "small";
-        } else if (whisperModel.match(/medium/)) {
-          model = "medium";
-        } else if (whisperModel.match(/large/)) {
-          model = "large-v3-turbo";
-        }
-
-        if (
-          learningLanguage.match(/en/) &&
-          model.match(/tiny|base|small|medium/)
-        ) {
-          model = `${model}.en`;
-        }
-      }
-
-      config = {
-        engine: "whisper",
-        whisper: {
-          model,
-          temperature: 0.2,
-          prompt: "",
-          encoderProvider: "cpu",
-          decoderProvider: "cpu",
-        },
-      };
-      EnjoyApp.userSettings.set(UserSettingKeyEnum.ECHOGARDEN, config);
-    }
-    setEchogardenSttConfig(config);
-  };
-
-  const handleSetEchogardenSttConfig = async (
-    config: EchogardenSttConfigType
-  ) => {
-    return EnjoyApp.userSettings
-      .set(UserSettingKeyEnum.ECHOGARDEN, config)
-      .then(() => {
-        setEchogardenSttConfig(config);
-      });
-  };
-
   useEffect(() => {
     refreshGptProviders();
     refreshTtsProviders();
@@ -196,8 +138,14 @@ export const AISettingsProvider = ({
     const _sttEngine = await EnjoyApp.userSettings.get(
       UserSettingKeyEnum.STT_ENGINE
     );
-    if (_sttEngine) {
+    if (Object.values(SttEngineOptionEnum).includes(_sttEngine)) {
       setSttEngine(_sttEngine);
+    } else if (_sttEngine) {
+      // A stored engine that no longer exists — the local one, retired with its
+      // model downloads. Left as it is, the select renders blank and
+      // Transcription falls through to a branch the user did not pick, so it is
+      // rewritten to the default rather than merely ignored.
+      handleSetSttEngine(SttEngineOptionEnum.OPENAI);
     }
 
     const _openai = await EnjoyApp.userSettings.get(UserSettingKeyEnum.OPENAI);
@@ -236,7 +184,6 @@ export const AISettingsProvider = ({
         });
     }
 
-    refreshEchogardenSttConfig();
     refreshTtsConfig();
   };
 
@@ -267,9 +214,6 @@ export const AISettingsProvider = ({
               }),
         openai,
         setOpenai: (config: LlmProviderType) => handleSetOpenai(config),
-        echogardenSttConfig,
-        setEchogardenSttConfig: (config: EchogardenSttConfigType) =>
-          handleSetEchogardenSttConfig(config),
         sttEngine,
         setSttEngine: (name: SttEngineOptionEnum) => handleSetSttEngine(name),
         ttsConfig,

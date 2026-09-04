@@ -80,6 +80,20 @@ does not open what it imported: the list that entry lands in refreshes itself
 now, and that navigation was only ever standing in for the push line.
 Pages that need a Hosted Enjoy account stay routable by address.
 
+## Transcription
+
+Transcription goes to OpenAI on the user's own key; the Hosted Enjoy engines
+stay selectable but need an account, and the local Whisper engine is gone
+along with the model downloads it needed. Alignment is untouched by any of
+that — it reads the audio signal, needs no model and no network, and is the
+only source of a Timeline.
+
+One Media yields two transcodes and both are needed. `echogarden.transcode`
+writes the 16 kHz WAV Alignment reads. `ffmpeg.compressForUpload` writes a
+16 kHz mono Opus copy, and that is the one uploaded: an uncompressed WAV
+crosses OpenAI's 25 MB limit after under seven minutes of stereo, where the
+copy holds over two hours. Neither is spare work for the other.
+
 ## Configuration
 
 Four environment variables steer it, the first two shared with Desktop Enjoy:
@@ -102,6 +116,13 @@ constant you can edit. See [ADR 0003](../../docs/adr/0003-fake-local-user-instea
 `yarn workspace enjoy test:web` runs `e2e/web-server.spec.ts`, which drives the
 local server's HTTP surface. That surface is the only seam this feature is
 tested on; the browser half is judged by hand, by design — see issue #1.
+
+The compressed upload copy and the WAV beside it are checked on that seam too,
+on fifteen minutes of stereo — the length that made the limit a real one.
+What no test here can reach is the request itself: that OpenAI accepts the
+copy, that a stalled upload ends at the timeout with a message rather than
+hanging, and that the Transcript aligns into sentences a person would draw the
+same way, are on the manual list.
 
 Pushing was verified by hand in the browser: with the Media list open and
 untouched, a Media imported from outside the browser appeared in it; a handler's

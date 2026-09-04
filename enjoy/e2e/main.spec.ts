@@ -60,36 +60,6 @@ test.afterAll(async () => {
   await electronApp.close();
 });
 
-test("validate echogarden recognition by whisper", async () => {
-  const res = await page.evaluate(() => {
-    return window.__ENJOY_APP__.echogarden.check({
-      engine: "whisper",
-      whisper: {
-        model: "tiny.en",
-        language: "en",
-        encoderProvider: "cpu",
-        decoderProvider: "cpu",
-      },
-    });
-  });
-  console.info(res.log);
-  expect(res.success).toBeTruthy();
-});
-
-test("validate echogarden recognition by whisper.cpp", async () => {
-  const res = await page.evaluate(() => {
-    return window.__ENJOY_APP__.echogarden.check({
-      engine: "whisper.cpp",
-      whisperCpp: {
-        model: "tiny.en",
-        language: "en",
-      },
-    });
-  });
-  console.info(res.log);
-  expect(res.success).toBeTruthy();
-});
-
 test("validate echogarden alignment", async () => {
   const res = await page.evaluate(() => {
     return window.__ENJOY_APP__.echogarden.checkAlign();

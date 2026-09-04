@@ -2,21 +2,6 @@ export * from "./chat-agent-templates";
 export * from "./gpt-presets";
 export * from "./ipa";
 
-export const WHISPER_MODELS = [
-  "tiny",
-  "tiny.en",
-  "base",
-  "base.en",
-  "small",
-  "small.en",
-  "medium",
-  "medium.en",
-  "large-v1",
-  "large-v2",
-  "large-v3",
-  "large-v3-turbo",
-];
-
 import languages from "./languages.json";
 export const LANGUAGES = languages;
 
@@ -65,6 +50,11 @@ export const VideoFormats = ["mp4", "mkv", "avi", "mov", "wmv", "flv", "webm"];
 export const DocumentFormats = ["epub", "md", "markdown", "html", "txt"];
 
 export const PROCESS_TIMEOUT = 1000 * 60 * 15;
+
+// Transcription uploads a whole Media in one request, so the wait is long by
+// design; without a limit of its own it is unbounded, and a stall is
+// indistinguishable from work.
+export const OPENAI_TRANSCRIBE_TIMEOUT = 1000 * 60 * 15;
 
 export const NOT_SUPPORT_JSON_FORMAT_MODELS = [
   "gpt-4-vision-preview",

@@ -84,104 +84,6 @@ export default class FfmpegWrapper {
     });
   }
 
-  ensureSampleRate(
-    input: string,
-    output: string,
-    sampleRate = 16000
-  ): Promise<string> {
-    logger.info(`Trying to convert ${input} to 16-bit file ${output}`);
-    if (fs.pathExistsSync(output)) {
-      logger.warn(`File ${output} already exists, deleting.`);
-      fs.removeSync(output);
-    }
-
-    const ffmpeg = Ffmpeg();
-    return new Promise((resolve, reject) => {
-      ffmpeg
-        .input(input)
-        .outputOptions("-ar", `${sampleRate}`)
-        .on("error", (err) => {
-          logger.error(err);
-          reject(err);
-        })
-        .on("end", () => {
-          logger.info(`File ${output} created`);
-          resolve(output);
-        })
-        .save(output);
-    });
-  }
-
-  convertToWav(
-    input: string,
-    output: string,
-    options: string[] = []
-  ): Promise<string> {
-    const ffmpeg = Ffmpeg();
-    return new Promise((resolve, reject) => {
-      ffmpeg
-        .input(input)
-        .outputOptions(
-          "-ar",
-          "16000",
-          "-ac",
-          "1",
-          "-c:a",
-          "pcm_s16le",
-          ...options
-        )
-        .on("start", (commandLine) => {
-          logger.debug(`Trying to convert ${input} to ${output}`);
-          logger.info("Spawned FFmpeg with command: " + commandLine);
-          fs.ensureDirSync(path.dirname(output));
-        })
-        .on("end", (stdout, stderr) => {
-          if (stdout) {
-            logger.debug(stdout);
-          }
-
-          if (stderr) {
-            logger.info(stderr);
-          }
-
-          if (fs.existsSync(output)) {
-            resolve(output);
-          } else {
-            reject(new Error("FFmpeg command failed"));
-          }
-        })
-        .on("error", (err: Error) => {
-          logger.error(err);
-          reject(err);
-        })
-        .save(output);
-    });
-  }
-
-  async prepareForWhisper(input: string, output: string): Promise<string> {
-    const metadata = await this.generateMetadata(input);
-
-    if (metadata.format.format_name === "wav") {
-      if (metadata.streams[0].sample_rate === 16000) {
-        logger.info(`File ${input} already in 16-bit WAVE format`);
-        return input;
-      } else {
-        return this.ensureSampleRate(
-          input,
-          input.replace(path.extname(input), "_16bit.wav")
-        );
-      }
-    }
-
-    logger.info(`Trying to convert ${input} to 16-bit WAVE file ${output}`);
-    if (fs.pathExistsSync(output)) {
-      logger.warn(`File ${output} already exists, deleting.`);
-      fs.removeSync(output);
-    }
-
-    return this.convertToWav(input, output);
-  }
-
   async transcode(
     input: string,
     output?: string,
@@ -355,6 +257,55 @@ export default class FfmpegWrapper {
     });
   }
 
+  /**
+   * Writes the copy Transcription uploads: 16 kHz mono Opus in an Ogg
+   * container.
+   *
+   * This is a second product beside the WAV `echogarden.transcode` writes, not
+   * a replacement for it, and deleting either one breaks something. Alignment
+   * reads the audio signal itself and is given the WAV; Transcription only has
+   * to get the audio across a wire, and an uncompressed 16 kHz WAV crosses
+   * OpenAI's 25 MB limit after under seven minutes of stereo. At 24 kbps the
+   * same limit holds over two hours.
+   *
+   * @param input - an `enjoy://` address, or a path
+   * @returns the `enjoy://` address of the copy
+   */
+  async compressForUpload(input: string): Promise<string> {
+    const filePath = enjoyUrlToPath(input);
+    const output = path.join(
+      settings.cachePath(),
+      `${path.basename(filePath, path.extname(filePath))}-${Date.now()}.ogg`
+    );
+
+    const ffmpeg = Ffmpeg();
+    return new Promise((resolve, reject) => {
+      ffmpeg
+        .input(filePath)
+        .outputOptions(
+          // prettier-ignore
+          "-ar", "16000", "-ac", "1",
+          "-c:a", "libopus", "-b:a", "24k",
+          // Constrained, so the bitrate above is a ceiling rather than a hope:
+          // it is what the two-hour figure is worked out from.
+          "-vbr", "constrained"
+        )
+        .on("start", (commandLine) => {
+          logger.info("Spawned FFmpeg with command: " + commandLine);
+          fs.ensureDirSync(path.dirname(output));
+        })
+        .on("end", () => {
+          logger.info(`File "${output}" created`);
+          resolve(pathToEnjoyUrl(output));
+        })
+        .on("error", (err: Error) => {
+          logger.error(err);
+          reject(err);
+        })
+        .save(output);
+    });
+  }
+
   registerIpcHandlers() {
     ipcMain.handle("ffmpeg-check-command", async (_event) => {
       return await this.checkCommand();
@@ -366,5 +317,9 @@ export default class FfmpegWrapper {
         return await this.transcode(input, output, options);
       }
     );
+
+    ipcMain.handle("ffmpeg-compress-for-upload", async (_event, input) => {
+      return await this.compressForUpload(input);
+    });
   }
 }

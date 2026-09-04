@@ -322,11 +322,6 @@ type EnjoyAppType = {
     delete: (id: string) => Promise<void>;
   };
   echogarden: {
-    getPackagesDir: () => Promise<string>;
-    recognize: (
-      input: string,
-      options: RecognitionOptions
-    ) => Promise<RecognitionResult>;
     align: (
       input: string | Uint8Array,
       transcript: string,
@@ -343,7 +338,6 @@ type EnjoyAppType = {
       language: string
     ) => Promise<Timeline>;
     transcode: (input: string) => Promise<string>;
-    check: (options?: any) => Promise<{ success: boolean; log: string }>;
     checkAlign: (options?: any) => Promise<{
       success: boolean;
       log: string;
@@ -356,6 +350,7 @@ type EnjoyAppType = {
       output: string,
       options?: string[]
     ) => Promise<string>;
+    compressForUpload: (input: string) => Promise<string>;
   };
   decompress: {
     onComplete: (callback: (event, task: DecompressTask) => void) => void;

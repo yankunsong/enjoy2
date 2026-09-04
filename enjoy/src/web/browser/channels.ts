@@ -180,19 +180,17 @@ export const channels: Namespace = {
   },
 
   echogarden: {
-    getPackagesDir: invoke("echogarden-get-packages-dir"),
-    recognize: invoke("echogarden-recognize"),
     align: invoke("echogarden-align"),
     alignSegments: invoke("echogarden-align-segments"),
     wordToSentenceTimeline: invoke("echogarden-word-to-sentence-timeline"),
     transcode: invoke("echogarden-transcode"),
-    check: invoke("echogarden-check"),
     checkAlign: invoke("echogarden-check-align"),
   },
 
   ffmpeg: {
     check: invoke("ffmpeg-check-command"),
     transcode: invoke("ffmpeg-transcode"),
+    compressForUpload: invoke("ffmpeg-compress-for-upload"),
   },
 
   decompress: {

@@ -74,7 +74,6 @@ type MediaShadowContextType = {
     isolate?: boolean;
   }) => Promise<void>;
   transcribing: boolean;
-  transcribingProgress: number;
   transcribingOutput: string;
   transcriptionDraft: TranscriptionType["result"];
   setTranscriptionDraft: (result: TranscriptionType["result"]) => void;
@@ -157,7 +156,6 @@ export const MediaShadowProvider = ({
     transcription,
     generateTranscription,
     transcribing,
-    transcribingProgress,
     transcribingOutput,
     abortGenerateTranscription,
   } = useTranscriptions(media);
@@ -743,7 +741,6 @@ export const MediaShadowProvider = ({
           setEditingRegion,
           generateTranscription,
           transcribing,
-          transcribingProgress,
           transcribingOutput,
           transcriptionDraft,
           setTranscriptionDraft,

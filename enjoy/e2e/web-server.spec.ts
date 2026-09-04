@@ -46,6 +46,16 @@ const ytDlpControl = (control: { failWith?: string }) =>
 const ytDlpArgv = (): string[] =>
   fs.readJSONSync(path.join(YT_DLP_DIR, "argv.json"));
 
+// What a Diary's Speech is made of. Neither shipped sample can stand in: both
+// are imported as Media by the tests above, and importing deduplicates by
+// content, so a Speech made of those bytes would find somebody else's Media
+// rather than make its own.
+const SAMPLE_SPEECH_AUDIO = path.join(
+  process.cwd(),
+  "test-results",
+  "diary-speech.mp3"
+);
+
 // A long stereo Media, the shape the upload limit is actually hit by. Fifteen
 // minutes of it as an uncompressed 16 kHz stereo WAV is far past OpenAI's
 // 25 MB; the fixture itself stays small because it ships compressed.
@@ -71,6 +81,21 @@ const buildSampleLongStereo = () => {
       "-f", "lavfi", "-i", "sine=frequency=440:duration=900",
       "-ac", "2", "-ar", "44100", "-b:a", "128k",
       "-y", SAMPLE_LONG_STEREO,
+    ],
+    { stdio: "ignore" }
+  );
+};
+
+const buildAudio = (output: string, duration: number) => {
+  if (fs.existsSync(output)) return;
+
+  fs.ensureDirSync(path.dirname(output));
+  execFileSync(
+    ffmpegPath(),
+    [
+      // prettier-ignore
+      "-f", "lavfi", "-i", `sine=frequency=660:duration=${duration}`,
+      "-y", output,
     ],
     { stdio: "ignore" }
   );
@@ -212,6 +237,7 @@ test.beforeAll(async () => {
   fs.ensureDirSync(resultDir);
   buildVideo(SAMPLE_VIDEO, 1);
   buildVideo(SAMPLE_YOUTUBE_VIDEO, 2);
+  buildAudio(SAMPLE_SPEECH_AUDIO, 3);
   buildSampleLongStereo();
   ytDlpControl({});
   await startHostedEnjoy();
@@ -1117,7 +1143,12 @@ const VOICE = {
   voice: "Rachel",
 };
 
-const createSpeech = (diaryId: string, text: string) =>
+/**
+ * @param audio the bytes the synthesis service handed back. Different text is
+ *   different audio, and importing a Speech deduplicates by content, so a
+ *   Speech that will become a Media needs its own.
+ */
+const createSpeech = (diaryId: string, text: string, audio = SAMPLE_AUDIO) =>
   ipc(
     "speeches-create",
     {
@@ -1129,7 +1160,7 @@ const createSpeech = (diaryId: string, text: string) =>
       segment: 0,
       configuration: VOICE,
     },
-    blobOf(SAMPLE_AUDIO, "audio/mp3")
+    blobOf(audio, "audio/mp3")
   );
 
 const findSpeech = (diaryId: string, text: string) =>
@@ -1206,6 +1237,130 @@ test("hands back the Speech already stored when the same bytes arrive again", as
   // stored Speech is already playing from. Arriving again must not empty it.
   const file = await speechFile(diarySpeech.filename);
   expect(fs.statSync(file).size).toBe(fs.statSync(SAMPLE_AUDIO).size);
+});
+
+/**
+ * Shadowing a Diary, which is the crossing that makes one practisable: the
+ * Speech is handed to the Media library along with the text it speaks, and
+ * comes back as an ordinary Media — so Recordings and Assessment work against
+ * your own writing with no new plumbing at all.
+ *
+ * The seeding is the point. Without it the player would run Transcription to
+ * recover words we typed ourselves; with it, it aligns the audio against a
+ * Transcript it already has.
+ */
+
+const SHADOWED_TEXT =
+  "I walked to the harbour before breakfast and the gulls were already up.";
+
+const SHADOWED_TITLE = "Before breakfast";
+
+/**
+ * What pressing Shadow does, as this seam sees it: look for a Media already
+ * made of these bytes, make one seeded with the text if there is none, and go
+ * to its address. Anything the renderer does either side of that is the
+ * router's.
+ */
+const shadow = async (title: string, speech: any) => {
+  const found = (await ipc("audios-find-one", { md5: speech.md5 })).body.result;
+  if (found) return found;
+
+  const created = await ipc("audios-create", speech.filePath, {
+    name: `[Diary] ${title}`,
+    originalText: speech.text,
+  });
+  expect(created.status).toBe(200);
+  return created.body.result;
+};
+
+const transcriptionOf = async (audioId: string) =>
+  (await ipc("transcriptions-find-or-create", {
+    targetId: audioId,
+    targetType: "Audio",
+  })).body.result;
+
+let shadowedSpeech: any;
+let shadowedAudio: any;
+
+test("makes a Media out of a Diary's Speech, playable from the Library", async () => {
+  test.setTimeout(120000);
+
+  const diary = (
+    await createDiary({ title: SHADOWED_TITLE, content: SHADOWED_TEXT })
+  ).body.result;
+  const created = await createSpeech(
+    diary.id,
+    SHADOWED_TEXT,
+    SAMPLE_SPEECH_AUDIO
+  );
+  expect(created.status).toBe(200);
+  shadowedSpeech = created.body.result;
+
+  shadowedAudio = await shadow(SHADOWED_TITLE, shadowedSpeech);
+  expect(shadowedAudio.src).toMatch(/^enjoy:\/\/library\/audios\//);
+
+  // The player fetches the Media by that address, so a Media it cannot reach is
+  // a Shadow button that lands on an empty page.
+  const played = await fetch(
+    `${baseUrl}/media/${shadowedAudio.src.replace("enjoy://", "")}`,
+    { headers: { Range: "bytes=0-99" } }
+  );
+  expect(played.status).toBe(206);
+
+  // What it is called in the Audios list, where it now sits among things the
+  // learner imported rather than wrote. The marker itself is the renderer's —
+  // a localised word this seam cannot see — so what is asserted here is the
+  // half that lives on this side: a name asked for at import is the name the
+  // list gives back, rather than the filename the bytes arrived under.
+  const { body } = await ipc("audios-find-all", {});
+  const listed = body.result.find((audio: any) => audio.id === shadowedAudio.id);
+  expect(listed.name).toBe(`[Diary] ${SHADOWED_TITLE}`);
+  expect(listed.name).not.toContain(path.basename(SAMPLE_SPEECH_AUDIO));
+});
+
+test("hands that Media a Transcript already carrying what the Diary says", async () => {
+  const transcription = await transcriptionOf(shadowedAudio.id);
+
+  // Asked for the way the player asks: find-or-create answers with whatever is
+  // there, so text in the answer can only have arrived with the import.
+  expect(transcription.result?.originalText).toBe(SHADOWED_TEXT);
+});
+
+test("leaves that Transcript in the state that leads to Alignment", async () => {
+  const transcription = await transcriptionOf(shadowedAudio.id);
+
+  // Pending, so the player still has work to do — and holding the text it has
+  // to do that work with, which is what sends it to Alignment instead of
+  // uploading audio to have words we wrote ourselves guessed back at us.
+  expect(transcription.state).toBe("pending");
+  expect(transcription.result?.originalText).toBeTruthy();
+
+  // Nothing to click yet: the sentences come out of Alignment, not out of here.
+  expect(transcription.result?.timeline).toBeFalsy();
+});
+
+test("arrives at the one Media when the same Diary is shadowed again", async () => {
+  // Both halves of shadowing again, asserted separately, because either one
+  // alone would hide the other failing: the lookup finds what the first visit
+  // made, and importing the same bytes again arrives at it rather than beside
+  // it.
+  const found = (
+    await ipc("audios-find-one", { md5: shadowedSpeech.md5 })
+  ).body.result;
+  expect(found.id).toBe(shadowedAudio.id);
+
+  const reimported = await ipc("audios-create", shadowedSpeech.filePath, {
+    name: `[Diary] ${SHADOWED_TITLE}`,
+    originalText: shadowedSpeech.text,
+  });
+  expect(reimported.body.result.id).toBe(shadowedAudio.id);
+
+  // Practice accumulates against a single Media, so a second visit must not
+  // start a second history beside the first.
+  const { body } = await ipc("audios-find-all", {
+    where: { md5: shadowedSpeech.md5 },
+  });
+  expect(body.result).toHaveLength(1);
 });
 
 test("reached Hosted Enjoy at no point along the way", async () => {

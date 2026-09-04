@@ -53,7 +53,7 @@
       "fileNotFound": "File not found {{file}}",
       "fileNotSupported": "File not supported {{file}}",
       "failedToCopyFile": "Failed to copy file {{file}}",
-      "failedToDownloadFile": "Failed to download file {{file}}",
+      "failedToDownloadFile": "Failed to download file {{file}}: {{error}}",
       "transcriptionFinished": "Transcription finished"
     },
     "recording": {

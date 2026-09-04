@@ -1,5 +1,4 @@
 import { viteStaticCopy } from "vite-plugin-static-copy";
-import os from "os";
 import path from "path";
 import type { ConfigEnv, UserConfig } from "vite";
 import { defineConfig, mergeConfig } from "vite";
@@ -16,12 +15,6 @@ export default defineConfig((env) => {
   const { forgeConfigSelf } = forgeEnv;
   const define = getBuildDefine(forgeEnv);
   const staticCopyTargets = [
-    {
-      src: `lib/youtubedr/${
-        process.env.PACKAGE_OS_ARCH || os.arch()
-      }/${os.platform()}/*`,
-      dest: "lib/youtubedr",
-    },
     {
       src: "lib/dictionaries/*",
       dest: "lib/dictionaries",

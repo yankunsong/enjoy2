@@ -106,6 +106,25 @@ writes the 16 kHz WAV Alignment reads. `ffmpeg.compressForUpload` writes a
 crosses OpenAI's 25 MB limit after under seven minutes of stereo, where the
 copy holds over two hours. Neither is spare work for the other.
 
+## Importing from YouTube
+
+A pasted YouTube link is fetched by yt-dlp, an external downloader kept up to
+date by people whose whole job is keeping up with YouTube — the previous one
+was built in March 2024 and YouTube stopped answering it long ago. The binary
+is not pinned by us; `ENJOY_YT_DLP_PATH` points at another one. See
+[ADR 0009](../../docs/adr/0009-yt-dlp-as-the-youtube-downloader.md).
+
+720p is asked for by name, picture and sound fetched separately and merged by
+the ffmpeg already shipped here. Progress travels the push line as bytes
+against a total — two streams, one bar — and a failure arrives as the `ERROR:`
+line yt-dlp printed rather than as "failed to download", since an expired
+downloader, an unavailable video and a link that was never a video are the
+same sentence otherwise. A download is given up on only after five minutes of
+silence, not after a fixed time, so a long video on a slow line finishes.
+
+Nothing about this is Local Web Enjoy's alone: Desktop Enjoy's YouTube import
+was broken by the same expiry and is fixed by the same change.
+
 ## Assessment
 
 Phoneme-level scoring runs on the user's own Azure Speech resource, set as a key
@@ -140,7 +159,7 @@ None of it reaches Hosted Enjoy. The models sync every record they save, and
 
 ## Configuration
 
-Five environment variables steer it, the first three shared with Desktop Enjoy:
+Six environment variables steer it, the first three shared with Desktop Enjoy:
 
 | Variable | Meaning |
 | --- | --- |
@@ -149,6 +168,7 @@ Five environment variables steer it, the first three shared with Desktop Enjoy:
 | `WEB_API_URL` | Where Hosted Enjoy would be. Nothing here calls it — `fake-web-api.ts` answers instead — so the tests point it at a local address and assert nothing ever arrives. |
 | `ENJOY_WEB_PORT` | Port for the local server; `0` picks a free one. Defaults to 7100. |
 | `ENJOY_WEB_UI_PORT` | Port for the frontend; `0` picks a free one. Defaults to 7101. |
+| `ENJOY_YT_DLP_PATH` | The yt-dlp a YouTube link is fetched with. Defaults to the one `youtube-dl-exec` installed. |
 
 Both servers bind the loopback address only.
 
@@ -192,6 +212,18 @@ failure arrived as a toast carrying the real message; a subscription that lost
 its connection received the next push after reconnecting, with no reload; and
 the Library address on a pushed record arrived in the browser's own scheme and
 answered a range request.
+
+Importing from YouTube is checked on the seam through a stand-in for yt-dlp
+(`e2e/fixtures/yt-dlp-stub.mjs`), pointed at by that same environment variable.
+Fetching from YouTube is the one thing on that path no test here can do;
+everything around it is what breaks, and is asserted — the quality asked for,
+the ffmpeg handed over to merge with, a progress bar that advances and never
+goes backwards over two streams, the Media that comes out playable, and, when
+the download fails, yt-dlp's own sentence arriving at the interface rather than
+a summary of it. What the stub cannot show was checked by hand against YouTube
+itself: a real link comes down at 1280×720, progress climbs to 100% once, an
+unavailable video's `This video is unavailable` arrives verbatim, and material
+that has no 720p imports at whatever it does have.
 
 Importing was verified by hand in the browser: dropping an audio file anywhere
 in the app imports it, dropping a video does the same, the "local file" button

@@ -24,6 +24,28 @@ const SAMPLE_VIDEO = path.join(process.cwd(), "test-results", "sample.mp4");
 const stagingDir = () =>
   path.join(resultDir, LIBRARY_PATH_SUFFIX, "cache", "staging");
 
+/**
+ * The stand-in for yt-dlp, and the directory the suite talks to it through.
+ * See e2e/fixtures/yt-dlp-stub.mjs.
+ */
+const YT_DLP_STUB = path.join(
+  process.cwd(),
+  "e2e",
+  "fixtures",
+  "yt-dlp-stub.mjs"
+);
+const YT_DLP_DIR = path.join(process.cwd(), "test-results", "yt-dlp");
+
+// What the stub hands back as the downloaded video. Importing deduplicates by
+// content, so it has to be a different video from the one imported by path.
+const SAMPLE_YOUTUBE_VIDEO = path.join(YT_DLP_DIR, "youtube.mp4");
+
+const ytDlpControl = (control: { failWith?: string }) =>
+  fs.outputJSONSync(path.join(YT_DLP_DIR, "control.json"), control);
+
+const ytDlpArgv = (): string[] =>
+  fs.readJSONSync(path.join(YT_DLP_DIR, "argv.json"));
+
 // A long stereo Media, the shape the upload limit is actually hit by. Fifteen
 // minutes of it as an uncompressed 16 kHz stereo WAV is far past OpenAI's
 // 25 MB; the fixture itself stays small because it ships compressed.
@@ -54,17 +76,17 @@ const buildSampleLongStereo = () => {
   );
 };
 
-const buildSampleVideo = () => {
-  if (fs.existsSync(SAMPLE_VIDEO)) return;
+const buildVideo = (output: string, duration: number) => {
+  if (fs.existsSync(output)) return;
 
-  fs.ensureDirSync(path.dirname(SAMPLE_VIDEO));
+  fs.ensureDirSync(path.dirname(output));
   execFileSync(
     ffmpegPath(),
     [
       // prettier-ignore
-      "-f", "lavfi", "-i", "testsrc=duration=1:size=64x64:rate=10",
-      "-f", "lavfi", "-i", "sine=frequency=440:duration=1",
-      "-shortest", "-y", SAMPLE_VIDEO,
+      "-f", "lavfi", "-i", `testsrc=duration=${duration}:size=64x64:rate=10`,
+      "-f", "lavfi", "-i", `sine=frequency=440:duration=${duration}`,
+      "-shortest", "-y", output,
     ],
     { stdio: "ignore" }
   );
@@ -116,6 +138,8 @@ const startServer = (settingsPath: string) =>
         SETTINGS_PATH: settingsPath,
         LIBRARY_PATH: settingsPath,
         ENJOY_WEB_PORT: "0",
+        ENJOY_YT_DLP_PATH: YT_DLP_STUB,
+        YT_DLP_STUB_DIR: YT_DLP_DIR,
         WEB_API_URL: hostedEnjoyUrl,
       },
       stdio: ["ignore", "pipe", "pipe"],
@@ -151,8 +175,10 @@ test.beforeAll(async () => {
   test.setTimeout(120000);
   fs.removeSync(resultDir);
   fs.ensureDirSync(resultDir);
-  buildSampleVideo();
+  buildVideo(SAMPLE_VIDEO, 1);
+  buildVideo(SAMPLE_YOUTUBE_VIDEO, 2);
   buildSampleLongStereo();
+  ytDlpControl({});
   await startHostedEnjoy();
 
   const started = await startServer(resultDir);
@@ -457,6 +483,100 @@ test("keeps pushing to a subscriber that reconnected", async () => {
   } finally {
     events.close();
   }
+});
+
+/**
+ * Importing from YouTube. The link is fetched by yt-dlp, an external
+ * downloader that keeps up with YouTube because keeping up with YouTube is the
+ * whole of what it does; what is asserted here is our half of that
+ * arrangement, driven through the stand-in described in
+ * e2e/fixtures/yt-dlp-stub.mjs.
+ */
+
+const YOUTUBE_URL = "https://www.youtube.com/watch?v=rFejpH_tAHM";
+
+const percentages = (messages: PushMessage[]) =>
+  messages
+    .filter((message) => message.channel === "download-on-state")
+    .map((message) => message.args[0])
+    .filter((state) => state.state === "progressing")
+    .map((state) => Math.round((state.received / state.total) * 100));
+
+test("fetches a YouTube link at 720p, and imports what came down", async () => {
+  const events = await openEvents();
+
+  try {
+    const created = await ipc("videos-create", YOUTUBE_URL, {
+      compressing: false,
+    });
+
+    expect(created.status).toBe(200);
+    expect(created.body.result.src).toMatch(/^enjoy:\/\/library\/videos\//);
+    // The link the Media was made from, kept on the record.
+    expect(created.body.result.source).toBe(YOUTUBE_URL);
+
+    // 720p asked for by name. The 360p Desktop Enjoy used to produce was the
+    // first stream that happened to carry sound, never a choice.
+    const argv = ytDlpArgv();
+    expect(argv[argv.indexOf("--format") + 1]).toContain("height<=720");
+
+    // Picture and sound come down separately at that quality, and the ffmpeg
+    // that merges them is the one this app already ships.
+    expect(argv).toContain("--merge-output-format");
+    expect(argv[argv.indexOf("--merge-output-format") + 1]).toBe("mp4");
+    expect(fs.existsSync(argv[argv.indexOf("--ffmpeg-location") + 1])).toBe(
+      true
+    );
+
+    // A dialog with nothing moving on it reads as hung, and the two streams
+    // are one bar: the second must not send the bar back to the start.
+    const advanced = percentages(events.messages);
+    expect(advanced.length).toBeGreaterThan(1);
+    expect([...advanced].sort((a, b) => a - b)).toEqual(advanced);
+    expect(advanced.at(-1)).toBe(100);
+
+    const played = await fetch(
+      `${baseUrl}/media/${created.body.result.src.replace("enjoy://", "")}`,
+      { headers: { Range: "bytes=0-99" } }
+    );
+    expect(played.status).toBe(206);
+  } finally {
+    events.close();
+  }
+});
+
+test("says what the downloader said when a download fails", async () => {
+  // The failure this ticket exists for: a downloader YouTube has stopped
+  // answering. Wrapped as "failed to download" it is indistinguishable from a
+  // dead network, and only one of those is ours to fix.
+  ytDlpControl({
+    failWith: "ERROR: [youtube] rFejpH_tAHM: Sign in to confirm you are human",
+  });
+
+  try {
+    const { status, body } = await ipc("videos-create", YOUTUBE_URL, {
+      compressing: false,
+    });
+
+    expect(status).toBe(500);
+    expect(body.error).toContain("Sign in to confirm you are human");
+  } finally {
+    ytDlpControl({});
+  }
+});
+
+test("names an unusable YouTube link in the downloader's own words", async () => {
+  // Not a video id, so nothing can come of it — but it is a YouTube address,
+  // and yt-dlp is who says what is wrong with a YouTube address. The generic
+  // file downloader, which used to get these, only ever fetched the page.
+  const { status, body } = await ipc(
+    "videos-create",
+    "https://www.youtube.com/watch?v=nope",
+    { compressing: false }
+  );
+
+  expect(status).toBe(500);
+  expect(body.error).toContain("Incomplete YouTube ID");
 });
 
 /**

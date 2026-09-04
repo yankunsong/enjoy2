@@ -4,7 +4,7 @@ import { FindOptions, WhereOptions, Attributes, Op } from "sequelize";
 import downloader from "@main/downloader";
 import log from "@main/logger";
 import { t } from "i18next";
-import youtubedr from "@main/youtubedr";
+import ytdlp from "@main/ytdlp";
 import { pathToEnjoyUrl } from "@/main/utils";
 
 const logger = log.scope("db/handlers/audios-handler");
@@ -76,8 +76,8 @@ class AudiosHandler {
     let file = uri;
     let source;
     if (uri.startsWith("http")) {
-      if (youtubedr.validateYtURL(uri)) {
-        file = await youtubedr.autoDownload(uri);
+      if (ytdlp.isYoutubeUrl(uri)) {
+        file = await ytdlp.autoDownload(uri, { webContents: event.sender });
       } else {
         file = await downloader.download(uri, {
           webContents: event.sender,

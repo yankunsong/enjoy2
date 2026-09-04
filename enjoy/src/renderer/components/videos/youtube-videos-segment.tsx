@@ -74,9 +74,9 @@ export const YoutubeVideosSegment = (props: { channel: string }) => {
 
   useEffect(() => {
     EnjoyApp.download.onState((_, downloadState) => {
-      const { state, received, speed } = downloadState;
+      const { state, received, total, speed } = downloadState;
       if (state === "progressing") {
-        setProgress(received);
+        setProgress(Math.floor((received / total) * 100));
         setDownloadSpeed(speed);
       }
     });

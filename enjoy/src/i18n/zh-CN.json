@@ -53,7 +53,7 @@
       "fileNotFound": "无法访问文件 {{file}}",
       "fileNotSupported": "文件不支持 {{file}}",
       "failedToCopyFile": "无法复制文件 {{file}}",
-      "failedToDownloadFile": "无法下载文件 {{file}}",
+      "failedToDownloadFile": "无法下载文件 {{file}}：{{error}}",
       "transcriptionFinished": "语音转文本完成"
     },
     "recording": {

@@ -33,6 +33,10 @@ export const MediaAddButton = (props: { type?: "Audio" | "Video" }) => {
   const [open, setOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [createdCount, setCreatedCount] = useState(0);
+  // A URL is fetched before it can be imported, and a YouTube link is fetched
+  // slowly enough that a dialog with nothing moving on it reads as hung.
+  const [downloadProgress, setDownloadProgress] = useState<number | null>(null);
+  const [downloadSpeed, setDownloadSpeed] = useState<string>();
 
   const navigate = useNavigate();
 
@@ -52,6 +56,7 @@ export const MediaAddButton = (props: { type?: "Audio" | "Video" }) => {
     }
 
     setSubmitting(true);
+    setDownloadProgress(null);
 
     if (files.length > 1) {
       Promise.allSettled(
@@ -132,6 +137,23 @@ export const MediaAddButton = (props: { type?: "Audio" | "Video" }) => {
     };
   }, [submitting]);
 
+  useEffect(() => {
+    if (!submitting) return;
+    if (files.length > 1) return;
+
+    EnjoyApp.download.onState((_, downloadState) => {
+      const { state, received, total, speed } = downloadState;
+      if (state !== "progressing") return;
+
+      setDownloadProgress(total ? Math.floor((received / total) * 100) : 0);
+      setDownloadSpeed(speed);
+    });
+
+    return () => {
+      EnjoyApp.download.removeAllListeners();
+    };
+  }, [submitting, files.length]);
+
   return (
     <Dialog open={open} onOpenChange={handleOpen}>
       <DialogTrigger asChild>
@@ -204,6 +226,15 @@ export const MediaAddButton = (props: { type?: "Audio" | "Video" }) => {
             <Progress value={(createdCount * 100.0) / files.length} max={100} />
             <span>
               {createdCount}/{files.length}
+            </span>
+          </div>
+        )}
+
+        {files.length <= 1 && submitting && downloadProgress !== null && (
+          <div className="flex items-center gap-2">
+            <Progress value={downloadProgress} max={100} />
+            <span className="text-sm text-muted-foreground min-w-max">
+              {downloadProgress}% {downloadSpeed}
             </span>
           </div>
         )}

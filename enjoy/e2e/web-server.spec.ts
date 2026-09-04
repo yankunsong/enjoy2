@@ -56,6 +56,32 @@ const SAMPLE_SPEECH_AUDIO = path.join(
   "diary-speech.mp3"
 );
 
+// The two Speeches of the Diary that gets deleted — an earlier draft and what
+// it was rewritten into — each needing bytes of its own for the same reason.
+// Two because regenerating is additive: a Diary that has been edited owns every
+// Speech it ever spoke, and deleting it has to take all of them.
+const SAMPLE_DOOMED_SPEECH_AUDIO = path.join(
+  process.cwd(),
+  "test-results",
+  "doomed-diary-speech.mp3"
+);
+
+const SAMPLE_DOOMED_DRAFT_AUDIO = path.join(
+  process.cwd(),
+  "test-results",
+  "doomed-diary-draft.mp3"
+);
+
+// The Recording made against the Media that Speech becomes. A Recording
+// deduplicates by content too, and globally rather than per Media, so bytes
+// another test already recorded would hand this one that test's Recording
+// instead of making a new one.
+const SAMPLE_DIARY_RECORDING = path.join(
+  process.cwd(),
+  "test-results",
+  "diary-recording.mp3"
+);
+
 // A long stereo Media, the shape the upload limit is actually hit by. Fifteen
 // minutes of it as an uncompressed 16 kHz stereo WAV is far past OpenAI's
 // 25 MB; the fixture itself stays small because it ships compressed.
@@ -238,6 +264,9 @@ test.beforeAll(async () => {
   buildVideo(SAMPLE_VIDEO, 1);
   buildVideo(SAMPLE_YOUTUBE_VIDEO, 2);
   buildAudio(SAMPLE_SPEECH_AUDIO, 3);
+  buildAudio(SAMPLE_DOOMED_SPEECH_AUDIO, 4);
+  buildAudio(SAMPLE_DOOMED_DRAFT_AUDIO, 5);
+  buildAudio(SAMPLE_DIARY_RECORDING, 2);
   buildSampleLongStereo();
   ytDlpControl({});
   await startHostedEnjoy();
@@ -1166,18 +1195,26 @@ const createSpeech = (diaryId: string, text: string, audio = SAMPLE_AUDIO) =>
 const findSpeech = (diaryId: string, text: string) =>
   ipc("speeches-find-one", { sourceId: diaryId, sourceType: "Diary", text });
 
-/** Where the Library keeps a Speech, which is under the local user's own directory. */
-const speechFile = async (filename: string) => {
+/** Where the Library keeps what a user owns, which is under their own directory. */
+const userLibraryFile = async (
+  kind: "speeches" | "recordings" | "audios",
+  filename: string
+) => {
   const userId = (await ipc("app-settings-get-user")).body.result.id;
 
   return path.join(
     resultDir,
     LIBRARY_PATH_SUFFIX,
     String(userId),
-    "speeches",
+    kind,
     filename
   );
 };
+
+const speechFile = (filename: string) => userLibraryFile("speeches", filename);
+
+const recordingFile = (filename: string) =>
+  userLibraryFile("recordings", filename);
 
 // The Diary that gets spoken, and then rewritten underneath its Speech.
 let spokenDiaryId: string;
@@ -1361,6 +1398,158 @@ test("arrives at the one Media when the same Diary is shadowed again", async () 
     where: { md5: shadowedSpeech.md5 },
   });
   expect(body.result).toHaveLength(1);
+});
+
+/**
+ * Deleting a Diary, which is the rule most expensive to get wrong. A Speech is
+ * a derivative of text that is going away, so it goes too. The Media that
+ * Speech became is not a derivative — it is a thing you practised against — so
+ * it stays, and with it the Transcript and every Recording made against it.
+ *
+ * The rule only means anything if there is practice history to destroy, so this
+ * Diary gets the whole chain before anything is deleted: two Speeches, since a
+ * Diary that has been edited keeps the one it used to say as well as the one it
+ * says now, the Media the current Speech becomes, and a Recording against that
+ * Media.
+ *
+ * A regression here is silent — a learner tidies up their writing and finds out
+ * long afterwards that their Recordings went with it — so what is asserted is
+ * the Library on disk as much as what the channels answer.
+ */
+
+const DOOMED_TITLE = "The last of the plums";
+
+const DOOMED_DRAFT = "We picked the last of the plums.";
+
+const DOOMED_TEXT =
+  "We picked the last of the plums and the wasps had got to most of them.";
+
+let doomedDiaryId: string;
+let doomedDraftSpeech: any;
+let doomedSpeech: any;
+let survivingAudio: any;
+let survivingRecording: any;
+
+test("stands a Diary up with two Speeches, a Media, and a Recording against it", async () => {
+  test.setTimeout(120000);
+
+  doomedDiaryId = (
+    await createDiary({ title: DOOMED_TITLE, content: DOOMED_DRAFT })
+  ).body.result.id;
+
+  // Spoken, then rewritten and spoken again — so the Diary now owns both, and
+  // deleting it has to take the pair rather than whichever one it reaches first.
+  doomedDraftSpeech = (
+    await createSpeech(doomedDiaryId, DOOMED_DRAFT, SAMPLE_DOOMED_DRAFT_AUDIO)
+  ).body.result;
+  await updateDiary(doomedDiaryId, { content: DOOMED_TEXT });
+  doomedSpeech = (
+    await createSpeech(doomedDiaryId, DOOMED_TEXT, SAMPLE_DOOMED_SPEECH_AUDIO)
+  ).body.result;
+
+  for (const speech of [doomedDraftSpeech, doomedSpeech]) {
+    expect(fs.existsSync(await speechFile(speech.filename))).toBe(true);
+  }
+
+  survivingAudio = await shadow(DOOMED_TITLE, doomedSpeech);
+
+  const recorded = await ipc("recordings-create", {
+    targetId: survivingAudio.id,
+    targetType: "Audio",
+    referenceId: 0,
+    referenceText: DOOMED_TEXT,
+    blob: blobOf(SAMPLE_DIARY_RECORDING, "audio/mpeg"),
+  });
+  expect(recorded.status).toBe(200);
+  survivingRecording = recorded.body.result;
+
+  // The history this deletion has to leave alone, confirmed to exist before it
+  // is put at risk — otherwise the assertions below would pass against a Diary
+  // that never had anything to lose.
+  expect(survivingRecording.targetId).toBe(survivingAudio.id);
+  expect(fs.existsSync(await recordingFile(survivingRecording.filename))).toBe(
+    true
+  );
+});
+
+test("takes every Speech the Diary owned, and their files, away with it", async () => {
+  const destroyed = await ipc("diaries-destroy", doomedDiaryId);
+  expect(destroyed.status).toBe(200);
+
+  for (const text of [DOOMED_DRAFT, DOOMED_TEXT]) {
+    const { status, body } = await findSpeech(doomedDiaryId, text);
+    expect(status).toBe(200);
+    expect(body.result).toBeNull();
+  }
+
+  // The mp3s go with the records, so that the Library does not fill up with
+  // speech for text that no longer exists. They are removed as each record's
+  // own departure settles, so this waits for them rather than reading once.
+  for (const speech of [doomedDraftSpeech, doomedSpeech]) {
+    const file = await speechFile(speech.filename);
+    await expect.poll(() => fs.existsSync(file)).toBe(false);
+  }
+});
+
+test("cannot find the deleted Diary any more, by id or in the list", async () => {
+  const { status, body } = await findDiary(doomedDiaryId);
+  expect(status).toBe(200);
+  expect(body.result ?? null).toBeNull();
+
+  expect(await diaryIds()).not.toContain(doomedDiaryId);
+});
+
+test("leaves the Media that Diary's Speech became, still playable", async () => {
+  const { body } = await ipc("audios-find-all", {});
+  const listed = body.result.find(
+    (audio: any) => audio.id === survivingAudio.id
+  );
+  expect(listed).toBeDefined();
+
+  // Both what the Library holds and what the player can fetch out of it: the
+  // Speech's file has just been removed from under this Media, and a Media
+  // whose own copy went with it is a page that loads and then plays nothing.
+  expect(
+    fs.existsSync(await userLibraryFile("audios", path.basename(listed.src)))
+  ).toBe(true);
+
+  const played = await fetch(
+    `${baseUrl}/media/${listed.src.replace("enjoy://", "")}`,
+    { headers: { Range: "bytes=0-99" } }
+  );
+  expect(played.status).toBe(206);
+});
+
+test("leaves that Media's Transcript, still carrying what the Diary said", async () => {
+  const transcription = await transcriptionOf(survivingAudio.id);
+
+  // Asked for the way the player asks. Find-or-create would answer a blank one
+  // had the original gone, so the Diary's own words coming back is what says
+  // the Transcript survived rather than was made again just now.
+  expect(transcription.result?.originalText).toBe(DOOMED_TEXT);
+});
+
+test("leaves the Recording made against it, file and all", async () => {
+  const { body } = await ipc("recordings-find-all", {
+    where: { targetId: survivingAudio.id, targetType: "Audio" },
+  });
+  const kept = body.result.find(
+    (recording: any) => recording.id === survivingRecording.id
+  );
+
+  // A Recording with no file is an Assessment that can never be played back
+  // against what was said, so both halves are asserted.
+  expect(kept).toBeDefined();
+  expect(fs.existsSync(await recordingFile(kept.filename))).toBe(true);
+});
+
+test("deletes a Diary that was never spoken, rather than failing", async () => {
+  const written = (await createDiary({ content: "Nothing said out loud." }))
+    .body.result;
+
+  const { status } = await ipc("diaries-destroy", written.id);
+  expect(status).toBe(200);
+  expect(await diaryIds()).not.toContain(written.id);
 });
 
 test("reached Hosted Enjoy at no point along the way", async () => {

@@ -5,6 +5,7 @@ import {
 } from "@renderer/context";
 import { SttEngineOptionEnum, UserSettingKeyEnum } from "@/types/enums";
 import { GPT_PROVIDERS, TTS_PROVIDERS } from "@renderer/components";
+import { isLocalWebEnjoy } from "@/distribution";
 import { fetchElevenLabsVoices } from "@renderer/lib/elevenlabs";
 import log from "electron-log/renderer";
 
@@ -115,19 +116,31 @@ export const AISettingsProvider = ({
     setTtsProviders({ ...providers });
   };
 
+  const DEFAULT_TTS_CONFIG = (): TtsConfigType => ({
+    engine: "elevenlabs",
+    model: "eleven_multilingual_v2",
+    // No default: an ElevenLabs voice id is account-specific, so there is no
+    // name to guess. The list arrives with the key.
+    voice: "",
+    language: learningLanguage,
+  });
+
   const refreshTtsConfig = async () => {
     let config = await EnjoyApp.userSettings.get(UserSettingKeyEnum.TTS_CONFIG);
+
     if (!config) {
-      config = {
-        engine: "elevenlabs",
-        model: "eleven_multilingual_v2",
-        // No default: an ElevenLabs voice id is account-specific, so there is
-        // no name to guess. The list arrives with the key.
-        voice: "",
-        language: learningLanguage,
-      };
+      config = DEFAULT_TTS_CONFIG();
+      EnjoyApp.userSettings.set(UserSettingKeyEnum.TTS_CONFIG, config);
+    } else if (isLocalWebEnjoy && config.engine === "enjoyai") {
+      // A stored engine that cannot run here, the same case the STT setting
+      // handles above: `enjoyai` proxies both OpenAI and Azure through an
+      // account this distribution does not have. Left alone it fails at the
+      // point of use, several steps from the setting that caused it, so it is
+      // rewritten to the default rather than merely ignored.
+      config = DEFAULT_TTS_CONFIG();
       EnjoyApp.userSettings.set(UserSettingKeyEnum.TTS_CONFIG, config);
     }
+
     setTtsConfig(config);
   };
 

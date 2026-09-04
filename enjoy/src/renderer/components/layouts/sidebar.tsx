@@ -39,6 +39,7 @@ import { t } from "i18next";
 import { Preferences } from "@renderer/components";
 import { AppSettingsProviderContext } from "@renderer/context";
 import { useContext, useEffect } from "react";
+import { isLocalWebEnjoy } from "@/distribution";
 import { NoticiationsChannel } from "@renderer/cables";
 import { useState } from "react";
 
@@ -113,34 +114,40 @@ export const Sidebar = (props: {
               isCollapsed={isCollapsed}
             />
 
-            <SidebarItem
-              href="/chats"
-              label={t("sidebar.chats")}
-              tooltip={t("sidebar.chats")}
-              active={activeTab.startsWith("/chats")}
-              Icon={MessagesSquareIcon}
-              isCollapsed={isCollapsed}
-            />
+            {/* Hosted Enjoy: an account these entries have no way to get. The
+                routes stay reachable by address; only the offer goes away. */}
+            {!isLocalWebEnjoy && (
+              <>
+                <SidebarItem
+                  href="/chats"
+                  label={t("sidebar.chats")}
+                  tooltip={t("sidebar.chats")}
+                  active={activeTab.startsWith("/chats")}
+                  Icon={MessagesSquareIcon}
+                  isCollapsed={isCollapsed}
+                />
 
-            <SidebarItem
-              href="/courses"
-              label={t("sidebar.courses")}
-              tooltip={t("sidebar.courses")}
-              active={activeTab.startsWith("/courses")}
-              Icon={GraduationCapIcon}
-              isCollapsed={isCollapsed}
-            />
+                <SidebarItem
+                  href="/courses"
+                  label={t("sidebar.courses")}
+                  tooltip={t("sidebar.courses")}
+                  active={activeTab.startsWith("/courses")}
+                  Icon={GraduationCapIcon}
+                  isCollapsed={isCollapsed}
+                />
 
-            <SidebarItem
-              href="/community"
-              label={t("sidebar.community")}
-              tooltip={t("sidebar.community")}
-              active={activeTab.startsWith("/community")}
-              Icon={UsersRoundIcon}
-              isCollapsed={isCollapsed}
-            />
+                <SidebarItem
+                  href="/community"
+                  label={t("sidebar.community")}
+                  tooltip={t("sidebar.community")}
+                  active={activeTab.startsWith("/community")}
+                  Icon={UsersRoundIcon}
+                  isCollapsed={isCollapsed}
+                />
 
-            <Separator />
+                <Separator />
+              </>
+            )}
 
             <SidebarItem
               href="/audios"

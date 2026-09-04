@@ -12,6 +12,7 @@ import { Button } from "@renderer/components/ui";
 import { t } from "i18next";
 import semver from "semver";
 import { DOWNLOAD_URL } from "@/constants";
+import { isLocalWebEnjoy } from "@/distribution";
 
 export default () => {
   const [channels, setChannels] = useState<string[]>([
@@ -26,7 +27,9 @@ export default () => {
     if (!webApi) return;
 
     webApi.config("ytb_channels").then((channels) => {
-      if (!channels) return;
+      // Remote configuration is whatever the other end sends. Under Local Web
+      // Enjoy there is no other end, and the empty answer is an empty object.
+      if (!Array.isArray(channels)) return;
 
       setChannels(channels);
     });
@@ -55,6 +58,9 @@ export default () => {
 const AuthorizationStatusBar = () => {
   const { user, logout } = useContext(AppSettingsProviderContext);
   if (!user) return null;
+  // The local user has no Hosted Enjoy token and never will; reporting that as
+  // an expired authorization would be an error message about nothing.
+  if (isLocalWebEnjoy) return null;
 
   if (!user.accessToken) {
     return (

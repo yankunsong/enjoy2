@@ -1,48 +1,119 @@
 /**
- * Launches the Local Web Enjoy server in a plain Node process.
+ * The one command: the local server and the frontend dev server, no build step.
  *
- * The main process source is TypeScript with path aliases, and it imports
- * `electron`. Rather than adding a build step, we run it through a Vite dev
- * server in SSR mode: Vite transforms the TypeScript and, more importantly,
- * resolves `electron` and `@main/window` to the stand-ins in this directory.
- * Edit a main process file and restarting the process is enough — there is
- * nothing to rebuild.
+ * The frontend is an ordinary Vite dev server with hot module replacement,
+ * pointed at `browser/index.html`. It proxies the interface and the media path
+ * across to the local server, so the browser only ever sees a single origin.
  */
+import fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import react from "@vitejs/plugin-react";
 import { createServer } from "vite";
+import {
+  PROJECT_ROOT,
+  WEB_DIR,
+  sharedAliases,
+  startLocalServer,
+} from "./local.mjs";
 
-const web = path.dirname(fileURLToPath(import.meta.url));
-const root = path.resolve(web, "../..");
+const DEFAULT_UI_PORT = 7101;
 
-const vite = await createServer({
-  root,
+const local = await startLocalServer();
+
+const ui = await createServer({
+  root: path.join(WEB_DIR, "browser"),
   configFile: false,
-  appType: "custom",
   logLevel: "warn",
-  server: { middlewareMode: true, hmr: false },
-  // Nothing is served to a browser from here, and dependency scanning would
-  // crawl the renderer entry for no reason.
-  optimizeDeps: { noDiscovery: true, include: [] },
+  plugins: [react(), serveAssets()],
+  // What tells the renderer it is the browser distribution, and the only build
+  // configuration Local Web Enjoy adds. The Electron build leaves it unset.
+  define: { "import.meta.env.VITE_LOCAL_WEB_ENJOY": JSON.stringify("true") },
   resolve: {
-    // Order matters: the two stand-ins have to win over the `@main` and bare
-    // module resolution that would otherwise match.
+    preserveSymlinks: true,
     alias: [
-      { find: /^electron$/, replacement: path.join(web, "fake-electron.ts") },
-      { find: /^@main\/window$/, replacement: path.join(web, "fake-window.ts") },
-      { find: "@main", replacement: path.join(root, "src/main") },
-      { find: "@renderer", replacement: path.join(root, "src/renderer") },
-      { find: "@commands", replacement: path.join(root, "src/commands") },
-      { find: "@", replacement: path.join(root, "src") },
+      // The third stand-in, and the only one on the browser side: Hosted
+      // Enjoy's client, which this distribution has no account for.
+      {
+        find: /^@\/api$/,
+        replacement: path.join(WEB_DIR, "browser/fake-web-api.ts"),
+      },
+      {
+        find: "vendor/pdfjs",
+        replacement: path.join(
+          PROJECT_ROOT,
+          "node_modules/foliate-js/vendor/pdfjs"
+        ),
+      },
+      ...sharedAliases(),
     ],
+  },
+  optimizeDeps: {
+    exclude: ["@ffmpeg/ffmpeg", "@ffmpeg/util"],
+    esbuildOptions: { target: "esnext" },
+  },
+  server: {
+    // Loopback only, on both servers: nothing else on the network can reach
+    // the Library, and the browser grants microphone access without a
+    // certificate.
+    host: "127.0.0.1",
+    port: Number(process.env.ENJOY_WEB_UI_PORT ?? DEFAULT_UI_PORT),
+    // The renderer lives outside this root; only the workspace is readable.
+    fs: { allow: [PROJECT_ROOT] },
+    // Trailing slashes: without them these prefixes would also swallow the
+    // bridge's own `ipc.ts`, which sits one directory away.
+    proxy: {
+      "/ipc/": { target: local.url },
+      "/media/": { target: local.url },
+    },
   },
 });
 
-try {
-  const { start } = await vite.ssrLoadModule("/src/web/index.ts");
-  await start();
-} catch (err) {
-  console.error(err);
-  await vite.close();
-  process.exit(1);
+await ui.listen();
+
+// Matches the local server's line, and is what the tests read the port from.
+console.log(`Local Web Enjoy UI listening on ${ui.resolvedUrls.local[0]}`);
+
+/**
+ * Serves the `assets` directory the renderer references by absolute path — the
+ * app icon and the CharisSIL font. Under Electron these are copied next to the
+ * bundle; here the originals are where they always were, and there is nothing
+ * to copy.
+ */
+function serveAssets() {
+  const types = {
+    ".css": "text/css",
+    ".gif": "image/gif",
+    ".ico": "image/x-icon",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".png": "image/png",
+    ".svg": "image/svg+xml",
+    ".ttf": "font/ttf",
+    ".webp": "image/webp",
+    ".woff2": "font/woff2",
+  };
+
+  return {
+    name: "local-web-enjoy-assets",
+    configureServer(server) {
+      const assets = path.join(PROJECT_ROOT, "assets");
+
+      server.middlewares.use("/assets", (request, response, next) => {
+        const file = path.resolve(
+          assets,
+          "." + decodeURIComponent(request.url.split("?")[0])
+        );
+
+        if (!file.startsWith(assets + path.sep) || !fs.existsSync(file)) {
+          return next();
+        }
+
+        response.setHeader(
+          "Content-Type",
+          types[path.extname(file)] ?? "application/octet-stream"
+        );
+        fs.createReadStream(file).pipe(response);
+      });
+    },
+  };
 }

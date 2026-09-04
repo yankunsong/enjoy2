@@ -23,7 +23,7 @@ let baseUrl: string;
 
 const startServer = (settingsPath: string) =>
   new Promise<{ child: ChildProcess; url: string }>((resolve, reject) => {
-    const child = spawn(process.execPath, ["src/web/start.mjs"], {
+    const child = spawn(process.execPath, ["src/web/local.mjs"], {
       cwd: process.cwd(),
       env: {
         ...process.env,
@@ -121,6 +121,31 @@ test("seeds the profile record the renderer reads back", async () => {
   const { body } = await ipc("user-settings-get", "profile");
 
   expect(body.result).toMatchObject({ id: userId });
+});
+
+test("serves a Library file, and the byte range a player asks for", async () => {
+  // The route the frontend proxies media through. The Library is empty at this
+  // point in the feature, so the fixture is written straight into it.
+  const library = path.join(resultDir, LIBRARY_PATH_SUFFIX);
+  fs.outputFileSync(path.join(library, "cache", "range.txt"), "0123456789");
+
+  const whole = await fetch(`${baseUrl}/media/library/cache/range.txt`);
+  expect(whole.status).toBe(200);
+  expect(await whole.text()).toBe("0123456789");
+
+  const part = await fetch(`${baseUrl}/media/library/cache/range.txt`, {
+    headers: { Range: "bytes=2-5" },
+  });
+  expect(part.status).toBe(206);
+  expect(part.headers.get("content-range")).toBe("bytes 2-5/10");
+  expect(await part.text()).toBe("2345");
+});
+
+test("names the file when the Library has nothing at that path", async () => {
+  const response = await fetch(`${baseUrl}/media/library/cache/absent.txt`);
+
+  expect(response.status).toBe(404);
+  expect((await response.json()).error).toContain("absent.txt");
 });
 
 test("names the channel when no handler is registered for it", async () => {

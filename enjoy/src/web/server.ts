@@ -1,8 +1,11 @@
 import http from "http";
 import { AddressInfo } from "net";
 import { ChannelNotFoundError, ipcMain } from "./fake-electron";
+import { MEDIA_ROUTE, serveLibraryFile } from "./library";
 
 export const DEFAULT_PORT = 7100;
+
+export const IPC_ROUTE = "/ipc/";
 
 /**
  * The local server's HTTP surface — the one seam Local Web Enjoy is tested on.
@@ -11,6 +14,9 @@ export const DEFAULT_PORT = 7100;
  * list the renderer would have passed, the response is what the handler
  * returned. Envelope shape is `{ result }` on success and `{ error }` on
  * failure, so a handler returning `undefined` still reads as a success.
+ *
+ * `GET /media/...` reproduces the `enjoy://` protocol, which is the other thing
+ * the renderer needs from its host.
  */
 export const createServer = () => {
   const server = http.createServer((request, response) => {
@@ -46,8 +52,12 @@ const handle = async (
     });
   }
 
-  if (request.method === "POST" && url.pathname.startsWith("/ipc/")) {
-    const channel = decodeURIComponent(url.pathname.slice("/ipc/".length));
+  if (request.method === "GET" && url.pathname.startsWith(MEDIA_ROUTE)) {
+    return serveLibraryFile(url.pathname, request, response);
+  }
+
+  if (request.method === "POST" && url.pathname.startsWith(IPC_ROUTE)) {
+    const channel = decodeURIComponent(url.pathname.slice(IPC_ROUTE.length));
     const args = await readArgs(request);
 
     try {

@@ -147,6 +147,12 @@ export const TTSForm = (props: { form: ReturnType<typeof useForm> }) => {
                       </SelectItem>
                     );
                   } else if (
+                    // A voice that names no language is not language-specific
+                    // and belongs in every list — ElevenLabs voices are keyed
+                    // by account, not by locale, and the model handles the
+                    // language. Voices that do name one are still filtered by
+                    // it, which is what Azure's several hundred need.
+                    !voice.language ||
                     voice.language === form.watch("config.tts.language")
                   ) {
                     return (

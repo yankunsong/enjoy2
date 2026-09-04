@@ -40,6 +40,64 @@ const seedLocalUser = () => {
 };
 
 /**
+ * Turns the credentials in the environment — which is what a `.env` file
+ * becomes, see `loadEnvFiles` in `local.mjs` — into the user settings the app
+ * already reads.
+ *
+ * Written into the settings rather than read at the point of use, so that
+ * nothing downstream has to learn a second place to look: the OpenAI client,
+ * Assessment's Azure config and ElevenLabs all go on reading the same rows the
+ * preference boxes write. The boxes stay usable for anyone who would rather
+ * type a key than keep a file.
+ *
+ * A variable that is set wins over what is stored, on every start — a key
+ * edited in `.env` is meant to take effect. A variable that is *not* set says
+ * nothing at all, and in particular does not erase what is stored, so filling
+ * in one key does not clear the two beside it.
+ */
+export const seedCredentialsFromEnv = async () => {
+  const {
+    OPENAI_API_KEY,
+    OPENAI_BASE_URL,
+    AZURE_SPEECH_KEY,
+    AZURE_SPEECH_REGION,
+    ELEVENLABS_API_KEY,
+  } = process.env;
+
+  await mergeSetting(UserSettingKeyEnum.OPENAI, {
+    key: OPENAI_API_KEY,
+    baseUrl: OPENAI_BASE_URL,
+  });
+
+  await mergeSetting(UserSettingKeyEnum.AZURE_SPEECH, {
+    key: AZURE_SPEECH_KEY,
+    region: AZURE_SPEECH_REGION,
+  });
+
+  await mergeSetting(UserSettingKeyEnum.ELEVENLABS, {
+    key: ELEVENLABS_API_KEY,
+  });
+};
+
+/**
+ * Writes the fields the environment actually named onto whatever is stored,
+ * and writes nothing at all when it named none of them.
+ */
+const mergeSetting = async (
+  key: UserSettingKeyEnum,
+  fields: Record<string, string | undefined>
+) => {
+  const named = Object.fromEntries(
+    Object.entries(fields).filter(([, value]) => value)
+  );
+  if (Object.keys(named).length === 0) return;
+
+  const stored = ((await UserSetting.get(key)) as Record<string, unknown>) ?? {};
+
+  await UserSetting.set(key, { ...stored, ...named });
+};
+
+/**
  * Seeds the profile record the renderer reads back after an account-less login.
  *
  * It lives in the database rather than in settings, so it can only be written

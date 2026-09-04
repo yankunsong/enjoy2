@@ -16,19 +16,19 @@ import {
   FormLabel,
   FormMessage,
 } from "@renderer/components/ui";
-import {
-  AISettingsProviderContext,
-  AppSettingsProviderContext,
-} from "@renderer/context";
-import { useContext, useEffect, useState } from "react";
-import { GPT_PROVIDERS } from "@renderer/components";
+import { AISettingsProviderContext } from "@renderer/context";
+import { useContext, useState } from "react";
 
 export const DefaultEngineSettings = () => {
-  const { currentGptEngine, setGptEngine, openai } = useContext(
+  // The engine table is `AISettingsProvider`'s, not this form's. It asks Hosted
+  // Enjoy for the same `gpt_providers` config, but merges the answer onto the
+  // built-in table rather than replacing it — which is what this form used to
+  // do with its own copy, and why an empty answer left it with no `enjoyai` to
+  // read models off. Under Local Web Enjoy the answer is always empty:
+  // `fake-web-api.ts` has no account to ask.
+  const { currentGptEngine, setGptEngine, openai, gptProviders } = useContext(
     AISettingsProviderContext
   );
-  const { webApi } = useContext(AppSettingsProviderContext);
-  const [providers, setProviders] = useState<any>(GPT_PROVIDERS);
   const [editing, setEditing] = useState(false);
 
   const gptEngineSchema = z
@@ -56,16 +56,18 @@ export const DefaultEngineSettings = () => {
     if (form.watch("name") === "openai") {
       const customModels = openai?.models?.split(",")?.filter(Boolean);
 
-      return customModels?.length ? customModels : providers.openai.models;
+      return customModels?.length
+        ? customModels
+        : gptProviders.openai.models;
     } else {
-      return providers.enjoyai.models;
+      return gptProviders.enjoyai.models;
     }
   };
 
   const onSubmit = async (data: z.infer<typeof gptEngineSchema>) => {
     const { name, models } = data;
 
-    let options = [...providers[name].models];
+    let options = [...gptProviders[name].models];
     if (name === "openai" && openai?.models) {
       options = openai.models.split(",");
     }
@@ -84,17 +86,6 @@ export const DefaultEngineSettings = () => {
     setGptEngine(data as GptEngineSettingType);
     setEditing(false);
   };
-
-  useEffect(() => {
-    webApi
-      .config("gpt_providers")
-      .then((data) => {
-        setProviders(data);
-      })
-      .catch((error) => {
-        console.error(error);
-      });
-  }, []);
 
   return (
     <Form {...form}>

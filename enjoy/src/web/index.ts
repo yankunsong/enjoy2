@@ -1,5 +1,9 @@
 import db from "@main/db";
-import { bootstrap, seedLocalProfile } from "./bootstrap";
+import {
+  bootstrap,
+  seedCredentialsFromEnv,
+  seedLocalProfile,
+} from "./bootstrap";
 import { createServer, DEFAULT_PORT } from "./server";
 import { clearStaging } from "./staging";
 
@@ -14,6 +18,7 @@ export const start = async () => {
   // user seeded and no profile record yet — the one order that has to hold.
   await db.connect();
   await seedLocalProfile();
+  await seedCredentialsFromEnv();
   await clearStaging();
 
   const server = createServer();

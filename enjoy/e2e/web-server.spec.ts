@@ -236,6 +236,88 @@ test("starts with nothing in its environment, the way the README says to", async
   }
 });
 
+/**
+ * Credentials out of the environment, which is what a `.env` file becomes.
+ *
+ * They are read once at startup and written into the same user settings the
+ * preference boxes write, so everything downstream — the OpenAI client,
+ * Assessment's Azure config, ElevenLabs — reads them from where it always did
+ * and none of it knows an environment variable was involved.
+ */
+test("takes the keys out of its environment and stores them where the app looks", async () => {
+  const home = path.join(resultDir, "env-home");
+  fs.ensureDirSync(home);
+
+  const { child, url } = await startServer(path.join(home, "library"), {
+    OPENAI_API_KEY: "sk-from-the-env-file",
+    AZURE_SPEECH_KEY: "azure-from-the-env-file",
+    AZURE_SPEECH_REGION: "eastus",
+    ELEVENLABS_API_KEY: "eleven-from-the-env-file",
+  });
+
+  const get = async (key: string) => {
+    const response = await fetch(`${url}/ipc/user-settings-get`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify([key]),
+    });
+    return (await response.json()).result;
+  };
+
+  try {
+    expect(await get("openai")).toMatchObject({ key: "sk-from-the-env-file" });
+    expect(await get("azure_speech")).toMatchObject({
+      key: "azure-from-the-env-file",
+      region: "eastus",
+    });
+    expect(await get("elevenlabs")).toMatchObject({
+      key: "eleven-from-the-env-file",
+    });
+  } finally {
+    child.kill();
+  }
+});
+
+/**
+ * A key the environment does not mention is not a key the environment says to
+ * erase. Someone who typed one into the preference boxes and then set only
+ * `OPENAI_API_KEY` should keep the other two.
+ */
+test("leaves a stored key alone when the environment says nothing about it", async () => {
+  const library = path.join(resultDir, "env-partial");
+  fs.ensureDirSync(library);
+
+  const set = async (url: string, key: string, value: unknown) =>
+    fetch(`${url}/ipc/user-settings-set`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify([key, value]),
+    });
+
+  const first = await startServer(library, {
+    OPENAI_API_KEY: "sk-first-run",
+  });
+  await set(first.url, "elevenlabs", { key: "typed-into-the-box" });
+  first.child.kill();
+
+  const second = await startServer(library, {
+    OPENAI_API_KEY: "sk-second-run",
+  });
+
+  try {
+    const response = await fetch(`${second.url}/ipc/user-settings-get`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(["elevenlabs"]),
+    });
+    expect((await response.json()).result).toMatchObject({
+      key: "typed-into-the-box",
+    });
+  } finally {
+    second.child.kill();
+  }
+});
+
 test("runs in a plain Node process, without Electron", async () => {
   const response = await fetch(`${baseUrl}/health`);
   expect(response.status).toBe(200);

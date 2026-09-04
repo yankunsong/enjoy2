@@ -39,6 +39,33 @@ export const settingsPath = () =>
   process.env.SETTINGS_PATH || path.join(os.homedir(), ".config", "enjoy-local-web");
 
 /**
+ * The `.env` files, read into the environment before anything else runs.
+ *
+ * Two of them, because `yarn workspace enjoy web` can be run from either
+ * directory and a key that silently does not arrive is a bad half hour. The
+ * workspace's own wins, and neither overwrites a variable already exported in
+ * the shell — an environment set on the command line is the more deliberate of
+ * the two.
+ *
+ * What lands here is picked up by `seedCredentialsFromEnv` in `bootstrap.ts`,
+ * which is where it turns into the settings the app reads.
+ */
+const loadEnvFiles = () => {
+  // The workspace's own first: `process.loadEnvFile` fills gaps rather than
+  // overwriting, so whichever is read first is the one that wins.
+  for (const dir of [PROJECT_ROOT, path.resolve(PROJECT_ROOT, "..")]) {
+    const file = path.join(dir, ".env");
+    if (!fs.existsSync(file)) continue;
+
+    try {
+      process.loadEnvFile(file);
+    } catch (err) {
+      console.warn(`Could not read ${file}: ${err.message}`);
+    }
+  }
+};
+
+/**
  * The path aliases both hosts share. The stand-ins each host swaps in are its
  * own; these three are just where the source lives, and drift between the two
  * lists would show up as a module resolving differently under Electron and here.
@@ -59,6 +86,8 @@ export const webApiAlias = () => [
 ];
 
 export const startLocalServer = async () => {
+  loadEnvFiles();
+
   // Before Vite loads a line of main process source: `@main/settings` reads it
   // as its module body runs, which is as early as anything here is imported.
   process.env.SETTINGS_PATH = settingsPath();

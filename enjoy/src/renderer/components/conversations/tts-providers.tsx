@@ -740,4 +740,19 @@ export const TTS_PROVIDERS: { [key: string]: any } = {
     voices: ["alloy", "echo", "fable", "onyx", "nova", "shimmer"],
     configurable: ["model", "language", "voice", "baseUrl"],
   },
+  elevenlabs: {
+    name: "ElevenLabs",
+    description: t("youNeedToSetupApiKeyBeforeUsingElevenLabs"),
+    models: ["eleven_multilingual_v2", "eleven_turbo_v2_5", "eleven_flash_v2_5"],
+    // Deliberately empty. Unlike every other provider here, an ElevenLabs voice
+    // is identified by an account-specific id rather than a name everyone
+    // shares, and the set of them depends on the account — the built-in ones,
+    // whatever has been added from the library, anything cloned. So the list is
+    // whatever the key says it is: `AISettingsProvider` fills this in from
+    // `GET /v1/voices` once a key is set, the way it fills the Ollama models in
+    // from a running Ollama. Writing ids down here would only be a guess that
+    // goes stale.
+    voices: [] as { label: string; value: string }[],
+    configurable: ["model", "language", "voice"],
+  },
 };

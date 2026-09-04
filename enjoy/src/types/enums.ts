@@ -5,6 +5,7 @@ export enum UserSettingKeyEnum {
   LEARNING_LANGUAGE = "learning_language",
   OPENAI = "openai",
   AZURE_SPEECH = "azure_speech",
+  ELEVENLABS = "elevenlabs",
   HOTKEYS = "hotkeys",
   GPT_ENGINE = "gpt_engine",
   STT_ENGINE = "stt_engine",

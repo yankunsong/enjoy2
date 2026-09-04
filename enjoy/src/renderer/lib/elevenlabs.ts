@@ -1,0 +1,94 @@
+/**
+ * ElevenLabs, spoken to directly with the user's own key.
+ *
+ * There is no SDK here and no proxy in front of it: two REST calls, both
+ * documented and both stable, against `xi-api-key`. The rest of the app knows
+ * ElevenLabs only through this module.
+ */
+
+const API_URL = "https://api.elevenlabs.io/v1";
+
+export type ElevenLabsVoice = {
+  label: string;
+  value: string;
+};
+
+/**
+ * The voices this key can reach — the account's built-in ones, whatever has
+ * been added from the voice library, anything cloned.
+ *
+ * This is the only place the list exists. A voice is named by an id rather than
+ * by a name every account shares, so unlike OpenAI's six there is nothing to
+ * write down ahead of time.
+ */
+export const fetchElevenLabsVoices = async (
+  key: string
+): Promise<ElevenLabsVoice[]> => {
+  const response = await fetch(`${API_URL}/voices`, {
+    headers: { "xi-api-key": key },
+  });
+
+  if (!response.ok) {
+    throw new Error(await readError(response));
+  }
+
+  const { voices = [] } = await response.json();
+
+  return voices.map((voice: any) => ({
+    // The category tells a built-in voice from a cloned one, which is the
+    // difference worth seeing in a list that is otherwise just first names.
+    label: voice.category ? `${voice.name} (${voice.category})` : voice.name,
+    value: voice.voice_id,
+  }));
+};
+
+/**
+ * Speaks `text`, and hands back the MP3 as bytes — the shape
+ * `EnjoyApp.speeches.create` stores, the same as OpenAI's and Azure's.
+ */
+export const elevenLabsSpeech = async (params: {
+  key: string;
+  voiceId: string;
+  modelId: string;
+  text: string;
+}): Promise<ArrayBuffer> => {
+  const { key, voiceId, modelId, text } = params;
+
+  const response = await fetch(`${API_URL}/text-to-speech/${voiceId}`, {
+    method: "POST",
+    headers: {
+      "xi-api-key": key,
+      "Content-Type": "application/json",
+      Accept: "audio/mpeg",
+    },
+    body: JSON.stringify({ text, model_id: modelId }),
+  });
+
+  if (!response.ok) {
+    throw new Error(await readError(response));
+  }
+
+  return response.arrayBuffer();
+};
+
+/**
+ * What ElevenLabs said went wrong, in its own words where it gave any.
+ *
+ * A failure here is nearly always the key or the quota, and both are things the
+ * user can act on — but only if the sentence survives the trip to the toast.
+ */
+const readError = async (response: Response): Promise<string> => {
+  const fallback = `ElevenLabs: ${response.status} ${response.statusText}`;
+
+  try {
+    const body = await response.json();
+    const detail = body?.detail;
+
+    if (typeof detail === "string") return detail;
+    if (typeof detail?.message === "string") return detail.message;
+
+    return fallback;
+  } catch {
+    return fallback;
+  }
+};

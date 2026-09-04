@@ -40,6 +40,15 @@ type AzureSpeechConfigType = {
   region?: string;
 };
 
+/**
+ * The user's own ElevenLabs account, which is what speech synthesis runs on.
+ * A key and nothing else: the voices it can reach are the account's, and are
+ * asked for rather than configured.
+ */
+type ElevenLabsConfigType = {
+  key?: string;
+};
+
 type DownloadStateType = {
   name: string;
   isPaused: boolean;

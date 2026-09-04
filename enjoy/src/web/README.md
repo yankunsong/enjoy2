@@ -125,6 +125,19 @@ silence, not after a fixed time, so a long video on a slow line finishes.
 Nothing about this is Local Web Enjoy's alone: Desktop Enjoy's YouTube import
 was broken by the same expiry and is fixed by the same change.
 
+## Speech synthesis
+
+The default engine is ElevenLabs, on the user's own key. OpenAI and Azure stay
+selectable — Azure only through `enjoyai`, which needs an account this
+distribution does not have.
+
+An ElevenLabs voice is named by an account-specific id rather than by a name
+every account shares, so unlike OpenAI's six there is no list to write down:
+`AISettingsProvider` asks `GET /v1/voices` for it once a key is set, the way it
+asks a running Ollama for its models. Until then the list is empty, and
+`use-speech` says which box is empty rather than sending a request that cannot
+work.
+
 ## Assessment
 
 Phoneme-level scoring runs on the user's own Azure Speech resource, set as a key
@@ -157,13 +170,28 @@ The record button's microphone gate is the browser's own — see
 None of it reaches Hosted Enjoy. The models sync every record they save, and
 `fake-web-api.ts` is what they sync to.
 
+## Credentials
+
+The three keys live in `.env`, in this workspace or the repository root — see
+`.env.example`, which lists them. They are read once at startup and written into
+the same user settings the preference boxes write, so nothing downstream learns
+a second place to look, and a key can equally well be typed into Preferences →
+Advanced instead. A variable that is set wins over what is stored; a variable
+left out changes nothing, so the two ways mix.
+
+| Variable | What it is for |
+| --- | --- |
+| `OPENAI_API_KEY` | Transcription. `OPENAI_BASE_URL` points at a compatible endpoint. |
+| `AZURE_SPEECH_KEY`, `AZURE_SPEECH_REGION` | Assessment, which is Azure's alone. |
+| `ELEVENLABS_API_KEY` | Speech synthesis. |
+
 ## Configuration
 
 Six environment variables steer it, the first three shared with Desktop Enjoy:
 
 | Variable | Meaning |
 | --- | --- |
-| `SETTINGS_PATH` | Directory holding `settings.json`. |
+| `SETTINGS_PATH` | Directory holding `settings.json`. Defaults to `~/.config/enjoy-local-web`, which is also where `app.getPath("userData")` points. |
 | `LIBRARY_PATH` | Where the Library goes. |
 | `WEB_API_URL` | Where Hosted Enjoy would be. Nothing here calls it — `fake-web-api.ts` answers instead — so the tests point it at a local address and assert nothing ever arrives. |
 | `ENJOY_WEB_PORT` | Port for the local server; `0` picks a free one. Defaults to 7100. |

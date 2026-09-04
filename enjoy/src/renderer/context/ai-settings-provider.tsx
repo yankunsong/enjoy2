@@ -5,6 +5,7 @@ import {
 } from "@renderer/context";
 import { SttEngineOptionEnum, UserSettingKeyEnum } from "@/types/enums";
 import { GPT_PROVIDERS, TTS_PROVIDERS } from "@renderer/components";
+import { fetchElevenLabsVoices } from "@renderer/lib/elevenlabs";
 import log from "electron-log/renderer";
 
 const logger = log.scope("ai-settings-provider.tsx");
@@ -16,6 +17,8 @@ type AISettingsProviderState = {
   setOpenai?: (config: LlmProviderType) => void;
   azureSpeech?: AzureSpeechConfigType;
   setAzureSpeech?: (config: AzureSpeechConfigType) => Promise<void>;
+  elevenlabs?: ElevenLabsConfigType;
+  setElevenlabs?: (config: ElevenLabsConfigType) => Promise<void>;
   setGptEngine?: (engine: GptEngineSettingType) => void;
   currentGptEngine?: GptEngineSettingType;
   gptProviders?: typeof GPT_PROVIDERS;
@@ -56,6 +59,10 @@ export const AISettingsProvider = ({
   // Assessment's own credentials. Empty until the user fills them in, which is
   // the state `use-pronunciation-assessments` reports rather than fails on.
   const [azureSpeech, setAzureSpeech] = useState<AzureSpeechConfigType>(null);
+  // Speech synthesis runs on the user's own ElevenLabs account, on the same
+  // terms: empty until filled in, and `use-speech` says so rather than failing
+  // somewhere further in.
+  const [elevenlabs, setElevenlabs] = useState<ElevenLabsConfigType>(null);
 
   const refreshGptProviders = async () => {
     let providers = GPT_PROVIDERS;
@@ -93,6 +100,18 @@ export const AISettingsProvider = ({
       console.warn(`Failed to fetch remote TTS config: ${e.message}`);
     }
 
+    // The voices an ElevenLabs key can actually reach, which is the only place
+    // that list exists — see the note beside the empty array in TTS_PROVIDERS.
+    if (elevenlabs?.key) {
+      try {
+        providers["elevenlabs"].voices = await fetchElevenLabsVoices(
+          elevenlabs.key
+        );
+      } catch (e) {
+        console.warn(`Failed to fetch ElevenLabs voices: ${e.message}`);
+      }
+    }
+
     setTtsProviders({ ...providers });
   };
 
@@ -100,9 +119,11 @@ export const AISettingsProvider = ({
     let config = await EnjoyApp.userSettings.get(UserSettingKeyEnum.TTS_CONFIG);
     if (!config) {
       config = {
-        engine: "enjoyai",
-        model: "openai/tts-1",
-        voice: "alloy",
+        engine: "elevenlabs",
+        model: "eleven_multilingual_v2",
+        // No default: an ElevenLabs voice id is account-specific, so there is
+        // no name to guess. The list arrives with the key.
+        voice: "",
         language: learningLanguage,
       };
       EnjoyApp.userSettings.set(UserSettingKeyEnum.TTS_CONFIG, config);
@@ -121,7 +142,7 @@ export const AISettingsProvider = ({
   useEffect(() => {
     refreshGptProviders();
     refreshTtsProviders();
-  }, [openai, gptEngine]);
+  }, [openai, gptEngine, elevenlabs]);
 
   useEffect(() => {
     if (db.state !== "connected") return;
@@ -165,6 +186,13 @@ export const AISettingsProvider = ({
       setAzureSpeech(_azureSpeech);
     }
 
+    const _elevenlabs = await EnjoyApp.userSettings.get(
+      UserSettingKeyEnum.ELEVENLABS
+    );
+    if (_elevenlabs) {
+      setElevenlabs(_elevenlabs);
+    }
+
     const _gptEngine = await EnjoyApp.userSettings.get(
       UserSettingKeyEnum.GPT_ENGINE
     );
@@ -204,6 +232,11 @@ export const AISettingsProvider = ({
     setAzureSpeech(config);
   };
 
+  const handleSetElevenlabs = async (config: ElevenLabsConfigType) => {
+    await EnjoyApp.userSettings.set(UserSettingKeyEnum.ELEVENLABS, config);
+    setElevenlabs(config);
+  };
+
   const handleSetOpenai = async (config: LlmProviderType) => {
     await EnjoyApp.userSettings.set(UserSettingKeyEnum.OPENAI, config);
     setOpenai(Object.assign({ name: "openai" }, config));
@@ -234,6 +267,9 @@ export const AISettingsProvider = ({
         azureSpeech,
         setAzureSpeech: (config: AzureSpeechConfigType) =>
           handleSetAzureSpeech(config),
+        elevenlabs,
+        setElevenlabs: (config: ElevenLabsConfigType) =>
+          handleSetElevenlabs(config),
         sttEngine,
         setSttEngine: (name: SttEngineOptionEnum) => handleSetSttEngine(name),
         ttsConfig,

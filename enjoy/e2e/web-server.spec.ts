@@ -186,6 +186,17 @@ const startServer = (
     );
   });
 
+/**
+ * A restart, which is what the durability tests are made of: the same Library
+ * on disk, reopened by a process that remembers nothing.
+ */
+const restartServer = async () => {
+  server.kill();
+  const restarted = await startServer(resultDir);
+  server = restarted.child;
+  baseUrl = restarted.url;
+};
+
 const ipc = async (channel: string, ...args: any[]) => {
   const response = await fetch(`${baseUrl}/ipc/${channel}`, {
     method: "POST",
@@ -482,10 +493,7 @@ test("imports a Media from an absolute path, with nothing staged", async () => {
 });
 
 test("still has the imported Media after a restart, and still plays it", async () => {
-  server.kill();
-  const restarted = await startServer(resultDir);
-  server = restarted.child;
-  baseUrl = restarted.url;
+  await restartServer();
 
   const { body } = await ipc("audios-find-all", {});
   const imported = body.result.find((audio: any) => audio.id === importedAudioId);
@@ -892,10 +900,7 @@ test("says what went wrong when the bytes hold no sound", async () => {
 });
 
 test("still has the Recording after a restart, and puts the next one beside it", async () => {
-  server.kill();
-  const restarted = await startServer(resultDir);
-  server = restarted.child;
-  baseUrl = restarted.url;
+  await restartServer();
 
   const { body } = await ipc("recordings-find-all", {
     where: { targetId: importedAudioId, targetType: "Audio" },
@@ -927,6 +932,163 @@ test("kept the Timeline across that restart too, which is what there is to click
 
   expect(status).toBe(200);
   expect(body.result.result.timeline.length).toBeGreaterThan(0);
+});
+
+/**
+ * The Diary, which runs the other way round from a Media: the text is what you
+ * wrote, and the audio is derived from it by Speech synthesis.
+ *
+ * These are the fixtures the later Diary tests lean on. Nothing here knows how
+ * a Diary is stored — a Diary is whatever comes back out of these channels.
+ */
+
+const createDiary = (params: { title?: string; content?: string }) =>
+  ipc("diaries-create", params);
+
+const updateDiary = (
+  id: string,
+  params: { title?: string; content?: string; config?: Record<string, any> }
+) => ipc("diaries-update", id, params);
+
+const findDiary = (id: string) => ipc("diaries-find-one", { id });
+
+const listDiaries = (query?: string) =>
+  ipc("diaries-find-all", query ? { query } : {});
+
+const diaryIds = async (query?: string) =>
+  (await listDiaries(query)).body.result.map((diary: any) => diary.id);
+
+/**
+ * `updatedAt` is what the list is ordered by, and two writes inside the same
+ * millisecond are indistinguishable to it. Waiting for the clock to move on is
+ * what makes "touched last" a fact rather than a coin toss.
+ */
+const waitForNewTimestamp = () =>
+  new Promise((resolve) => setTimeout(resolve, 20));
+
+const DIARY_TEXT = [
+  "Morning walk",
+  "",
+  "The fog came in off the water and stayed until nine.",
+].join("\n");
+
+// The Diary the tests after this one keep writing to, and the one that has to
+// still be there after the restart.
+let diaryId: string;
+
+test("keeps a Diary's text, and titles it from the first line", async () => {
+  const { status, body } = await createDiary({ content: DIARY_TEXT });
+
+  expect(status).toBe(200);
+  diaryId = body.result.id;
+
+  const read = await findDiary(diaryId);
+  expect(read.status).toBe(200);
+  expect(read.body.result.content).toBe(DIARY_TEXT);
+  // Nameless was never an option: a Diary reaches the list titled, the way a
+  // notes app does it.
+  expect(read.body.result.title).toBe("Morning walk");
+});
+
+test("keeps a title that was typed by hand, through a later edit to the body", async () => {
+  const created = await createDiary({
+    title: "Sea fog",
+    content: "The fog came in.",
+  });
+  const id = created.body.result.id;
+
+  const edited = await updateDiary(id, { content: "Low cloud, all morning." });
+  expect(edited.status).toBe(200);
+
+  // Read back rather than believe the answer: an edit that never reached the
+  // database would still hand back a correct-looking record.
+  const { body } = await findDiary(id);
+  // The first line changed; the title did not, because a person chose it.
+  expect(body.result.title).toBe("Sea fog");
+  expect(body.result.content).toBe("Low cloud, all morning.");
+});
+
+test("lists Diaries by what was touched last", async () => {
+  const older = (await createDiary({ content: "Older entry" })).body.result;
+  await waitForNewTimestamp();
+  const newer = (await createDiary({ content: "Newer entry" })).body.result;
+
+  const before = await diaryIds();
+  // Both are in the list at all: an ordering read from positions alone would
+  // be just as happy with a list that had lost one of them.
+  expect(before).toEqual(expect.arrayContaining([older.id, newer.id]));
+  expect(before.indexOf(newer.id)).toBeLessThan(before.indexOf(older.id));
+
+  await waitForNewTimestamp();
+  await updateDiary(older.id, { content: "Older entry, revisited" });
+
+  // Touching the older one moves it to the front; that is what the list is for.
+  const after = await diaryIds();
+  expect(after).toEqual(expect.arrayContaining([older.id, newer.id]));
+  expect(after.indexOf(older.id)).toBeLessThan(after.indexOf(newer.id));
+});
+
+test("finds a Diary by words that are only in its body", async () => {
+  const created = await createDiary({
+    title: "Tuesday",
+    content: "A heron stood in the shallows for twenty minutes.",
+  });
+
+  const found = await diaryIds("heron");
+
+  expect(found).toContain(created.body.result.id);
+  // And only that one: a search that quietly ignored what was typed would
+  // hand back every Diary written so far and still contain the right id.
+  expect(found).not.toContain(diaryId);
+});
+
+test("finds nothing when nothing matches, rather than everything", async () => {
+  const { status, body } = await listDiaries("cormorant");
+
+  expect(status).toBe(200);
+  expect(body.result).toEqual([]);
+});
+
+test("leaves the voice alone when the text is edited", async () => {
+  const voice = { tts: { engine: "elevenlabs", voice: "Rachel" } };
+  await updateDiary(diaryId, { config: voice });
+
+  const edited = await updateDiary(diaryId, {
+    content: `${DIARY_TEXT}\n\nBy noon it had burned off.`,
+  });
+  expect(edited.status).toBe(200);
+
+  // Saving the body is a different form from the popover that chose the voice,
+  // and it has no business carrying the voice away with it.
+  const { body } = await findDiary(diaryId);
+  expect(body.result.config).toEqual(voice);
+});
+
+test("leaves the title and text alone when the voice is changed", async () => {
+  const before = (await findDiary(diaryId)).body.result;
+
+  const changed = await updateDiary(diaryId, {
+    config: { tts: { engine: "elevenlabs", voice: "Adam" } },
+  });
+  expect(changed.status).toBe(200);
+
+  const { body } = await findDiary(diaryId);
+  expect(body.result.title).toBe(before.title);
+  expect(body.result.content).toBe(before.content);
+  expect(body.result.config.tts.voice).toBe("Adam");
+});
+
+test("still has the Diary, unchanged, after a restart", async () => {
+  const before = (await findDiary(diaryId)).body.result;
+
+  await restartServer();
+
+  const { status, body } = await findDiary(diaryId);
+
+  expect(status).toBe(200);
+  expect(body.result.title).toBe(before.title);
+  expect(body.result.content).toBe(before.content);
+  expect(body.result.config).toEqual(before.config);
 });
 
 test("reached Hosted Enjoy at no point along the way", async () => {

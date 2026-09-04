@@ -196,6 +196,9 @@
       "fileNotFound": "文件未找到 {{file}}",
       "fileNotSupported": "文件格式不支持 {{file}}",
       "failedToCopyFile": "复制文件失败 {{file}}"
+    },
+    "diary": {
+      "notFound": "日记不存在"
     }
   },
   "sidebar": {
@@ -219,7 +222,8 @@
     "profile": "个人主页",
     "notes": "笔记",
     "help": "帮助",
-    "collapse": "收起"
+    "collapse": "收起",
+    "diary": "日记"
   },
   "form": {
     "lengthMustBeAtLeast": "{{field}} 长度不可超过 {{length}} 个字符",
@@ -937,5 +941,15 @@
   "checkingForUpdate": "正在检查更新",
   "updateAvailable": "有新版本",
   "quitAndInstall": "退出并安装新版本",
-  "pleaseSelect": "请选择"
+  "pleaseSelect": "请选择",
+  "newDiary": "新建日记",
+  "untitledDiary": "无标题日记",
+  "noDiariesYet": "还没有日记，写下第一篇吧。",
+  "writeYourDiaryHere": "在这里写日记……",
+  "writeSomethingToGenerateSpeech": "先写点内容，然后就可以生成语音了。",
+  "generateSpeech": "生成语音",
+  "startShadowing": "跟读练习",
+  "saving": "保存中……",
+  "deleteDiaryConfirm": "确定删除这篇日记吗？已经练习过的音频会保留。",
+  "diaryDeletedSuccessfully": "日记已删除"
 }

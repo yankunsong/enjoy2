@@ -444,6 +444,13 @@ type EnjoyAppType = {
     update: (id: string, params: any) => Promise<ChatMessageType>;
     destroy: (id: string) => Promise<ChatMessageType>;
   };
+  diaries: {
+    findAll: (params?: any) => Promise<DiaryType[]>;
+    findOne: (params: any) => Promise<DiaryType>;
+    create: (params: any) => Promise<DiaryType>;
+    update: (id: string, params: any) => Promise<DiaryType>;
+    destroy: (id: string) => Promise<void>;
+  };
   documents: {
     findAll: (params?: any) => Promise<DocumentEType[]>;
     findOne: (params: any) => Promise<DocumentEType>;

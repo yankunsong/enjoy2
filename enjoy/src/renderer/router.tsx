@@ -11,6 +11,8 @@ import Audios from "./pages/audios";
 import Videos from "./pages/videos";
 import Stories from "./pages/stories";
 import Story from "./pages/story";
+import Diaries from "./pages/diaries";
+import Diary from "./pages/diary";
 import Documents from "./pages/documents";
 import Document from "./pages/document";
 import Profile from "./pages/profile";
@@ -167,6 +169,22 @@ export default createHashRouter([
         element: (
           <ProtectedPage>
             <Video />
+          </ProtectedPage>
+        ),
+      },
+      {
+        path: "/diaries",
+        element: (
+          <ProtectedPage>
+            <Diaries />
+          </ProtectedPage>
+        ),
+      },
+      {
+        path: "/diaries/:id",
+        element: (
+          <ProtectedPage>
+            <Diary />
           </ProtectedPage>
         ),
       },

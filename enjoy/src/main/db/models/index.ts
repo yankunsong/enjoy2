@@ -5,6 +5,7 @@ export * from "./chat-agent";
 export * from "./chat-member";
 export * from "./chat-message";
 export * from "./conversation";
+export * from "./diary";
 export * from "./message";
 export * from "./note";
 export * from "./pronunciation-assessment";

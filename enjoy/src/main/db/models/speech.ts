@@ -21,7 +21,7 @@ import settings from "@main/settings";
 import OpenAI, { type ClientOptions } from "openai";
 import { t } from "i18next";
 import { hashFile } from "@main/utils";
-import { Audio, Document, Message, UserSetting } from "@main/db/models";
+import { Audio, Diary, Document, Message, UserSetting } from "@main/db/models";
 import log from "@main/logger";
 import proxyAgent from "@main/proxy-agent";
 
@@ -55,13 +55,16 @@ export class Speech extends Model<Speech> {
   sourceType: string;
 
   @Column(DataType.VIRTUAL)
-  source: Message | Document;
+  source: Message | Document | Diary;
 
   @BelongsTo(() => Message, { foreignKey: "sourceId", constraints: false })
   message: Message;
 
   @BelongsTo(() => Document, { foreignKey: "sourceId", constraints: false })
   document: Document;
+
+  @BelongsTo(() => Diary, { foreignKey: "sourceId", constraints: false })
+  diary: Diary;
 
   @HasOne(() => Audio, "md5")
   audio: Audio;
@@ -141,10 +144,16 @@ export class Speech extends Model<Speech> {
         instance.document !== undefined
       ) {
         instance.source = instance.document;
+      } else if (
+        instance.sourceType === "Diary" &&
+        instance.diary !== undefined
+      ) {
+        instance.source = instance.diary;
       }
       // To prevent mistakes:
       delete instance.dataValues.message;
       delete instance.dataValues.document;
+      delete instance.dataValues.diary;
     }
   }
 

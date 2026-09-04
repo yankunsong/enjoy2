@@ -773,6 +773,23 @@ contextBridge.exposeInMainWorld("__ENJOY_APP__", {
       return ipcRenderer.invoke("chat-messages-destroy", id);
     },
   },
+  diaries: {
+    findAll: (params: any) => {
+      return ipcRenderer.invoke("diaries-find-all", params);
+    },
+    findOne: (params: any) => {
+      return ipcRenderer.invoke("diaries-find-one", params);
+    },
+    create: (params: any) => {
+      return ipcRenderer.invoke("diaries-create", params);
+    },
+    update: (id: string, params: any) => {
+      return ipcRenderer.invoke("diaries-update", id, params);
+    },
+    destroy: (id: string) => {
+      return ipcRenderer.invoke("diaries-destroy", id);
+    },
+  },
   documents: {
     findAll: (params: any) => {
       return ipcRenderer.invoke("documents-find-all", params);

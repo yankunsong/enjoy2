@@ -19,6 +19,7 @@ import {
   HeadphonesIcon,
   VideoIcon,
   NewspaperIcon,
+  PenLineIcon,
   BookMarkedIcon,
   UserIcon,
   BotIcon,
@@ -164,6 +165,18 @@ export const Sidebar = (props: {
               tooltip={t("sidebar.videos")}
               active={activeTab.startsWith("/videos")}
               Icon={VideoIcon}
+              isCollapsed={isCollapsed}
+            />
+
+            {/* Diaries are written here rather than imported, so unlike the
+                ebook reader below there is no account and no engine this
+                distribution lacks: it is offered everywhere. */}
+            <SidebarItem
+              href="/diaries"
+              label={t("sidebar.diary")}
+              tooltip={t("sidebar.diary")}
+              active={activeTab.startsWith("/diaries")}
+              Icon={PenLineIcon}
               isCollapsed={isCollapsed}
             />
 

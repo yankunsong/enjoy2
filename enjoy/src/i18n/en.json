@@ -196,6 +196,9 @@
       "fileNotFound": "File not found {{file}}",
       "fileNotSupported": "File not supported {{file}}",
       "failedToCopyFile": "Failed to copy file {{file}}"
+    },
+    "diary": {
+      "notFound": "Diary not found"
     }
   },
   "sidebar": {
@@ -219,7 +222,8 @@
     "profile": "My Profile",
     "notes": "Note",
     "help": "Help",
-    "collapse": "Collapse"
+    "collapse": "Collapse",
+    "diary": "Diary"
   },
   "form": {
     "lengthMustBeAtLeast": "{{field}} must be at least {{length}} characters",
@@ -937,5 +941,15 @@
   "checkingForUpdate": "Checking for update",
   "updateAvailable": "Update available",
   "quitAndInstall": "Quit and install",
-  "pleaseSelect": "Please select"
+  "pleaseSelect": "Please select",
+  "newDiary": "New diary",
+  "untitledDiary": "Untitled diary",
+  "noDiariesYet": "No diaries yet. Write your first one.",
+  "writeYourDiaryHere": "Write your diary here...",
+  "writeSomethingToGenerateSpeech": "Write something first, then you can generate speech from it.",
+  "generateSpeech": "Generate speech",
+  "startShadowing": "Shadow this",
+  "saving": "Saving...",
+  "deleteDiaryConfirm": "Are you sure to delete this diary? The audio you have already practised against will be kept.",
+  "diaryDeletedSuccessfully": "Diary deleted successfully"
 }

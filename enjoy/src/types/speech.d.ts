@@ -2,7 +2,7 @@ type SpeechType = {
   id: string;
   sourceId: string;
   sourceType: string;
-  source?: MessageType;
+  source?: MessageType | DocumentEType | DiaryType;
   text: string;
   section: number;
   segment: number;

@@ -247,6 +247,8 @@ export const channels: Namespace = {
   chatMembers: crud("chat-members"),
   chatMessages: crud("chat-messages"),
 
+  diaries: crud("diaries"),
+
   documents: crud("documents", {
     upload: invoke("documents-upload"),
     cleanUp: invoke("documents-clean-up"),

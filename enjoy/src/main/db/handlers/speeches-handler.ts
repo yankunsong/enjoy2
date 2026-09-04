@@ -45,6 +45,15 @@ class SpeechesHandler {
     const md5 = await hashFile(file, { algo: "md5" });
     fs.renameSync(file, path.join(path.dirname(file), `${md5}.${format}`));
 
+    // The same text in the same voice synthesises to the same bytes, and md5 is
+    // unique — so synthesising it twice is a collision, not a failure. Say so
+    // by handing back what is already there. Reachable from a Diary, whose text
+    // can be edited back to what it said before.
+    const existing = await Speech.findOne({ where: { md5 } });
+    if (existing) {
+      return existing.toJSON();
+    }
+
     return Speech.create({ ...params, extname: `.${format}`, md5 })
       .then((speech) => {
         return speech.toJSON();

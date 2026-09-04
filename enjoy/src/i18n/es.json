@@ -196,6 +196,9 @@
       "fileNotFound": "Archivo no encontrado {{file}}",
       "fileNotSupported": "Archivo no compatible {{file}}",
       "failedToCopyFile": "Error al copiar el archivo {{file}}"
+    },
+    "diary": {
+      "notFound": "Diario no encontrado"
     }
   },
   "sidebar": {
@@ -219,7 +222,8 @@
     "profile": "Mi Perfil",
     "notes": "Nota",
     "help": "Ayuda",
-    "collapse": "Contraer"
+    "collapse": "Contraer",
+    "diary": "Diario"
   },
   "form": {
     "lengthMustBeAtLeast": "{{field}} debe tener al menos {{length}} caracteres",
@@ -937,5 +941,15 @@
   "checkingForUpdate": "Buscando actualización",
   "updateAvailable": "Actualización disponible",
   "quitAndInstall": "Salir e instalar",
-  "pleaseSelect": "Por favor, selecciona"
+  "pleaseSelect": "Por favor, selecciona",
+  "newDiary": "Nuevo diario",
+  "untitledDiary": "Diario sin título",
+  "noDiariesYet": "Aún no hay diarios. Escribe el primero.",
+  "writeYourDiaryHere": "Escribe tu diario aquí...",
+  "writeSomethingToGenerateSpeech": "Escribe algo primero y luego podrás generar el audio.",
+  "generateSpeech": "Generar audio",
+  "startShadowing": "Practicar shadowing",
+  "saving": "Guardando...",
+  "deleteDiaryConfirm": "¿Seguro que quieres eliminar este diario? El audio con el que ya has practicado se conservará.",
+  "diaryDeletedSuccessfully": "Diario eliminado correctamente"
 }

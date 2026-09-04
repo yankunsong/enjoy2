@@ -9,13 +9,24 @@ and have your pronunciation scored.
 **Media**:
 A piece of imported spoken-language material you practise against. Concretely an
 Audio or a Video row; `Media` is the word for either when the distinction does
-not matter.
+not matter. A Diary's Speech becomes a Media the first time you shadow it.
 _Avoid_: source, content, asset
 
 **Library**:
 The on-disk directory holding every imported Media file plus the SQLite database
 describing them.
 _Avoid_: collection, workspace
+
+**Diary**:
+A piece of text you wrote yourself, kept for practising against. Where a Media is
+imported, a Diary is authored: its Transcript exists before any audio does, and
+the audio is derived from the text by Speech synthesis.
+_Avoid_: note, document, journal, entry
+
+**Speech**:
+Audio synthesised from a piece of text, addressed by the text it speaks. The
+bridge from a Diary to something shadowable.
+_Avoid_: TTS output, generated audio, voiceover
 
 **Transcript**:
 The plain text of what is spoken in a Media.

@@ -14,6 +14,8 @@
     "enjoy:test": "yarn workspace enjoy test",
     "enjoy:test:main": "yarn workspace enjoy test:main",
     "enjoy:test:renderer": "yarn workspace enjoy test:renderer",
+    "enjoy:test:web": "yarn workspace enjoy test:web",
+    "enjoy:web:server": "yarn workspace enjoy web:server",
     "enjoy:package": "yarn workspace enjoy package",
     "enjoy:make": "yarn workspace enjoy make",
     "enjoy:publish": "yarn workspace enjoy publish",

@@ -11,4 +11,4 @@ Local Web Enjoy 需要在没有 Electron 的普通 Node 进程里运行 Desktop 
 
 ## Consequences
 
-主进程代码从此隐含一条约束：**新代码只能使用 `ipcMain` 和 `app.getPath` 这两个已被伪造的 Electron 接口**。用到其他 Electron API 的主进程代码会在 Local Web Enjoy 下运行时才失败，而不是构建时。
+主进程代码从此隐含一条约束：**新代码只能使用 `ipcMain`、`app.getPath` 和 `app.isPackaged` 这几个已被伪造的 Electron 接口**（`app.isPackaged` 决定数据库文件名，既有代码已经依赖它）。用到其他 Electron API 的主进程代码会在 Local Web Enjoy 下运行时才失败，而不是构建时。

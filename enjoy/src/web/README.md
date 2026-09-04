@@ -17,10 +17,13 @@ Run it with `yarn workspace enjoy web`, which starts both halves:
 - `fake-window.ts` — stands in for `@main/window`, reproducing the one thing the
   models want from it: the push outlet.
 - `push.ts` — the single sink both push outlets funnel into.
+- `events.ts` — `GET /events`, which carries that sink to the browser as
+  server-sent events. See [ADR 0007](../../docs/adr/0007-push-over-sse-keyed-by-channel.md).
 - `server.ts` — the HTTP surface, and the only seam this feature is tested on.
   `POST /ipc/:channel` is the one the browser bridge talks to, `GET /media/...`
   serves Media the way the `enjoy://` protocol does under Electron,
-  `POST /files/:name` takes in a file the browser has only the bytes of, and
+  `POST /files/:name` takes in a file the browser has only the bytes of,
+  `GET /events` streams what the main process pushes, and
   `GET /health` exists so "runs without Electron" is something a test can check
   rather than something the README merely claims.
 - `library.ts` — the Library half of that surface, including byte ranges, without
@@ -41,10 +44,11 @@ Run it with `yarn workspace enjoy web`, which starts both halves:
 
 - `start.mjs` — the one command. Starts the local server, then a second Vite dev
   server for the frontend, with hot module replacement and no build step. It
-  proxies `/ipc/`, `/media/` and `/files/` across, so the browser sees one
-  origin.
-- `browser/main.ts` — the entry point: install the bridge, then hand over to the
-  renderer, which reads the bridge while its own modules are still evaluating.
+  proxies `/ipc/`, `/media/`, `/files/` and `/events` across, so the browser
+  sees one origin.
+- `browser/main.ts` — the entry point: install the bridge, subscribe to the push
+  channel, then hand over to the renderer, which reads the bridge while its own
+  modules are still evaluating.
 - `browser/bridge.ts` — builds `window.__ENJOY_APP__`, the object the preload
   script exposes under Electron.
 - `browser/channels.ts` — the declaration table almost all of it is generated
@@ -56,11 +60,13 @@ Run it with `yarn workspace enjoy web`, which starts both halves:
   picker and answers in paths, the currency Electron's dialog answers in.
 - `browser/ipc.ts`, `browser/events.ts` — the two things the bridge is made of: a
   call across to the local server, and a subscription to what it pushes back.
-  Nothing pushes yet; carrying the server's sink across is a later ticket.
+  The subscription is one `EventSource` on `/events`, dispatched by the channel
+  name the message carries, which is what lets every `onState(callback)`-shaped
+  signature survive the move unchanged.
 - `browser/media-url.ts` — the one thing neither side can say in the other's
-  terms: a Library address. Rewritten both ways across `ipc.ts`, so the renderer
-  only sees addresses it can fetch and the main process only sees addresses it
-  can resolve. See [ADR 0006](../../docs/adr/0006-rewrite-library-urls-at-the-bridge.md).
+  terms: a Library address. Rewritten both ways across `ipc.ts`, and on the way
+  in across `events.ts`, so the renderer only sees addresses it can fetch and
+  the main process only sees addresses it can resolve. See [ADR 0006](../../docs/adr/0006-rewrite-library-urls-at-the-bridge.md).
 - `browser/files.ts` — sends a file's bytes to `POST /files/`, and is the whole
   of `EnjoyApp.localFile`, the one namespace the preload script has no
   counterpart for. `dialog.showOpenDialog` answers through it too, which is what
@@ -69,7 +75,9 @@ Run it with `yarn workspace enjoy web`, which starts both halves:
 The renderer itself is shared whole, unpruned — see [ADR 0002](../../docs/adr/0002-reuse-entire-renderer.md).
 `src/distribution.ts` is the one flag it reads. It decides which sidebar entries
 to offer, and mounts `MediaDropImport` — the window-wide drop target, which
-exists only here because under Electron a dropped file already has a path.
+exists only here because under Electron a dropped file already has a path. It
+does not open what it imported: the list that entry lands in refreshes itself
+now, and that navigation was only ever standing in for the push line.
 Pages that need a Hosted Enjoy account stay routable by address.
 
 ## Configuration
@@ -95,10 +103,17 @@ constant you can edit. See [ADR 0003](../../docs/adr/0003-fake-local-user-instea
 local server's HTTP surface. That surface is the only seam this feature is
 tested on; the browser half is judged by hand, by design — see issue #1.
 
+Pushing was verified by hand in the browser: with the Media list open and
+untouched, a Media imported from outside the browser appeared in it; a handler's
+failure arrived as a toast carrying the real message; a subscription that lost
+its connection received the next push after reconnecting, with no reload; and
+the Library address on a pushed record arrived in the browser's own scheme and
+answered a range request.
+
 Importing was verified by hand in the browser: dropping an audio file anywhere
-in the app imports it and opens it, dropping a video does the same, the "local
-file" button opens the browser's picker and imports what it returns, pasting an
-absolute path imports without a byte crossing `/files/`, and seeking inside an
+in the app imports it, dropping a video does the same, the "local file" button
+opens the browser's picker and imports what it returns, pasting an absolute
+path imports without a byte crossing `/files/`, and seeking inside an
 imported Media lands where it was dragged to.
 
 The browser half of the previous ticket was verified by hand: the browser opens
@@ -111,11 +126,6 @@ work, editing a renderer file updates the page with nothing rebuilt, and neither
 server answers on a non-loopback address.
 
 ## Known rough edges
-
-A Media list does not notice an import until it is remounted, because it
-refreshes from database transactions the main process pushes and nothing is
-pushed to the browser yet. Importing opens the new Media, so this is invisible
-until several files are imported at once. The push line is a later ticket.
 
 The console carries a running commentary of degraded calls — the system proxy
 settings the app reads at startup have no handler registered here, and every

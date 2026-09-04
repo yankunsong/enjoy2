@@ -273,3 +273,128 @@ test("still has the imported Media after a restart, and still plays it", async (
   // Nothing staged outlives the restart; the import copied what it needed.
   expect(fs.readdirSync(stagingDir())).toEqual([]);
 });
+
+/**
+ * Pushing at the renderer. The main process has two push outlets — the main
+ * window and the sender of the invoking call — and both of them come out here,
+ * so the browser can be told a Media appeared without having asked.
+ */
+
+// The second shipped audio sample. Importing deduplicates by content, so the
+// one the tests above imported cannot be imported again here.
+const SECOND_SAMPLE_AUDIO = path.join(process.cwd(), "samples", "jfk.wav");
+
+// Duplicated from src/web/push.ts for the same reason as the constants above:
+// this file runs outside the app's module resolution.
+type PushMessage = { channel: string; args: any[] };
+
+const openEvents = async () => {
+  const controller = new AbortController();
+  const response = await fetch(`${baseUrl}/events`, {
+    signal: controller.signal,
+  });
+  const messages: PushMessage[] = [];
+
+  // Reading the stream is the subscription; it outlives the call, and ends
+  // when the abort below tears the connection down.
+  void (async () => {
+    const decoder = new TextDecoder();
+    let buffer = "";
+    try {
+      for await (const chunk of response.body as any) {
+        buffer += decoder.decode(chunk, { stream: true });
+        const events = buffer.split("\n\n");
+        buffer = events.pop() ?? "";
+        for (const event of events) {
+          const data = event
+            .split("\n")
+            .find((line) => line.startsWith("data:"));
+          if (data) messages.push(JSON.parse(data.slice("data:".length)));
+        }
+      }
+    } catch {
+      // Aborting mid-read is how this ends; it is not a failure.
+    }
+  })();
+
+  return {
+    response,
+    messages,
+    close: () => controller.abort(),
+    waitFor: async (channel: string) => {
+      for (let attempt = 0; attempt < 200; attempt++) {
+        const message = messages.find((item) => item.channel === channel);
+        if (message) return message;
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      }
+      throw new Error(
+        `Nothing arrived on "${channel}"; got ${JSON.stringify(messages.map((m) => m.channel))}`
+      );
+    },
+  };
+};
+
+test("streams what the models push at the main window", async () => {
+  const events = await openEvents();
+
+  try {
+    expect(events.response.status).toBe(200);
+    expect(events.response.headers.get("content-type")).toContain(
+      "text/event-stream"
+    );
+
+    const created = await ipc("audios-create", SECOND_SAMPLE_AUDIO, {
+      compressing: false,
+    });
+    expect(created.status).toBe(200);
+
+    const message = await events.waitFor("db-on-transaction");
+    expect(message.args[0]).toMatchObject({
+      model: "Audio",
+      action: "create",
+      id: created.body.result.id,
+    });
+  } finally {
+    events.close();
+  }
+});
+
+test("streams what a handler pushes at its caller", async () => {
+  const events = await openEvents();
+
+  try {
+    // A handler reports its own failures by pushing a notification and
+    // returning nothing, so the call succeeding is part of the shape.
+    const { status } = await ipc("conversations-find-all", {
+      where: { noSuchColumn: "boom" },
+    });
+    expect(status).toBe(200);
+
+    const message = await events.waitFor("on-notification");
+    expect(message.args[0]).toMatchObject({ type: "error" });
+  } finally {
+    events.close();
+  }
+});
+
+/**
+ * The reconnect a browser makes for itself is `EventSource`'s, which no test
+ * on this seam can drive; what is checked here is the half that could actually
+ * be broken on this side — that a stream torn down leaves the server able to
+ * carry the next one.
+ */
+test("keeps pushing to a subscriber that reconnected", async () => {
+  const dropped = await openEvents();
+  dropped.close();
+
+  const events = await openEvents();
+  try {
+    const { body } = await ipc("audios-find-all", {});
+    await ipc("audios-update", body.result[0].id, { name: "Renamed" });
+
+    const message = await events.waitFor("db-on-transaction");
+    expect(message.args[0]).toMatchObject({ model: "Audio", action: "update" });
+  } finally {
+    events.close();
+  }
+});

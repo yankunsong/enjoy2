@@ -1,5 +1,4 @@
 import { useContext, useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { t } from "i18next";
 import { LoaderIcon, UploadIcon } from "lucide-react";
 import { toast } from "@renderer/components/ui";
@@ -18,7 +17,6 @@ export const MediaDropImport = () => {
   const { EnjoyApp } = useContext(AppSettingsProviderContext);
   const [dragging, setDragging] = useState(false);
   const [importing, setImporting] = useState(false);
-  const navigate = useNavigate();
 
   const carriesFiles = (event: DragEvent) =>
     Array.from(event.dataTransfer?.types ?? []).includes("Files");
@@ -90,25 +88,21 @@ export const MediaDropImport = () => {
           })
         );
       } else {
+        // Nothing navigates afterwards: a Media list refreshes itself from the
+        // database transactions the local server pushes, so what was imported
+        // appears wherever the user happens to be standing.
         toast.success(t("resourceAdded"));
       }
-
-      // A Media list refreshes from the database transactions it is told about,
-      // and nothing is pushed to the browser yet, so opening what was imported
-      // is both the useful thing to do and the thing that shows it landed.
-      if (created.length > 0) navigate(created[0]);
     } finally {
       setImporting(false);
     }
   };
 
-  /** Returns where the imported Media can be found. */
   const importOne = async (file: File) => {
-    const kind = MEDIA_KINDS[mediaTypeOf(file)];
+    const namespace = MEDIA_NAMESPACES[mediaTypeOf(file)];
     const path = await EnjoyApp.localFile.stage(file);
-    const media = await EnjoyApp[kind.namespace].create(path);
 
-    return `${kind.route}/${media.id}`;
+    return EnjoyApp[namespace].create(path);
   };
 
   if (!dragging && !importing) return null;
@@ -132,16 +126,13 @@ export const MediaDropImport = () => {
   );
 };
 
-/**
- * The two things a Media is, and the two places each name is spelled: the
- * bridge namespace that imports one, and the address it lives at afterwards.
- */
-const MEDIA_KINDS = {
-  Audio: { namespace: "audios", route: "/audios" },
-  Video: { namespace: "videos", route: "/videos" },
+/** The two things a Media is, and the bridge namespace that imports each. */
+const MEDIA_NAMESPACES = {
+  Audio: "audios",
+  Video: "videos",
 } as const;
 
-const mediaTypeOf = (file: File): keyof typeof MEDIA_KINDS | null => {
+const mediaTypeOf = (file: File): keyof typeof MEDIA_NAMESPACES | null => {
   const extension = file.name.split(".").pop()?.toLowerCase() ?? "";
 
   if (AudioFormats.includes(extension)) return "Audio";

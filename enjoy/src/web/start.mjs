@@ -61,6 +61,10 @@ const ui = await createServer({
       "/ipc/": { target: local.url },
       "/media/": { target: local.url },
       "/files/": { target: local.url },
+      // The push channel has no trailing slash to keep it apart from the
+      // bridge's own `events.ts`, so it is anchored instead. Proxied streams
+      // pass through unbuffered, which is what an endless response needs.
+      "^/events$": { target: local.url },
     },
   },
 });

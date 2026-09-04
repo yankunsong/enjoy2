@@ -1,5 +1,6 @@
 import http from "http";
 import { AddressInfo } from "net";
+import { EVENTS_ROUTE, streamEvents } from "./events";
 import { ChannelNotFoundError, ipcMain } from "./fake-electron";
 import { send } from "./json";
 import { MEDIA_ROUTE, serveLibraryFile } from "./library";
@@ -18,6 +19,9 @@ export const IPC_ROUTE = "/ipc/";
  *
  * `GET /media/...` reproduces the `enjoy://` protocol, which is the other thing
  * the renderer needs from its host.
+ *
+ * `GET /events` reproduces the pushes the main process makes at the renderer,
+ * which under Electron travel back down the same IPC channel.
  *
  * `POST /files/:name` has no Electron counterpart, because under Electron a
  * dragged file already has a path. It is where the browser puts the bytes of
@@ -55,6 +59,10 @@ const handle = async (
       // out loud makes the claim testable rather than aspirational.
       electron: Boolean(process.versions.electron),
     });
+  }
+
+  if (request.method === "GET" && url.pathname === EVENTS_ROUTE) {
+    return streamEvents(request, response);
   }
 
   if (request.method === "GET" && url.pathname.startsWith(MEDIA_ROUTE)) {

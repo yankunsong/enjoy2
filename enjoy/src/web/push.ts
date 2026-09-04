@@ -4,9 +4,9 @@
  * Desktop Enjoy pushes through exactly two outlets — the main window's
  * `webContents` and the `sender` of the invoking IPC event — so faking those
  * two lets several dozen push sites in the handlers and models run unchanged.
- * Both outlets funnel here. Nothing subscribes yet — the browser gets these
- * over SSE in a later ticket — so for now messages are pushed into an empty
- * room, which is at least an observable one.
+ * Both outlets funnel here, and `GET /events` carries what arrives across to
+ * the browser. With no browser attached the messages go into an empty room,
+ * which is the same thing Desktop Enjoy does before its window opens.
  */
 
 export type PushMessage = { channel: string; args: unknown[] };

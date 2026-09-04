@@ -129,18 +129,28 @@ const startHostedEnjoy = () =>
     });
   });
 
-const startServer = (settingsPath: string) =>
+/**
+ * @param settingsPath where to keep `settings.json` and the Library, or
+ *   `undefined` to leave both unset and let the server decide, which is what
+ *   the documented one command does.
+ */
+const startServer = (
+  settingsPath: string | undefined,
+  extraEnv: Record<string, string> = {}
+) =>
   new Promise<{ child: ChildProcess; url: string }>((resolve, reject) => {
     const child = spawn(process.execPath, ["src/web/local.mjs"], {
       cwd: process.cwd(),
       env: {
         ...process.env,
-        SETTINGS_PATH: settingsPath,
-        LIBRARY_PATH: settingsPath,
+        ...(settingsPath
+          ? { SETTINGS_PATH: settingsPath, LIBRARY_PATH: settingsPath }
+          : { SETTINGS_PATH: undefined, LIBRARY_PATH: undefined }),
         ENJOY_WEB_PORT: "0",
         ENJOY_YT_DLP_PATH: YT_DLP_STUB,
         YT_DLP_STUB_DIR: YT_DLP_DIR,
         WEB_API_URL: hostedEnjoyUrl,
+        ...extraEnv,
       },
       stdio: ["ignore", "pipe", "pipe"],
     });
@@ -189,6 +199,41 @@ test.beforeAll(async () => {
 test.afterAll(async () => {
   server?.kill();
   hostedEnjoy?.close();
+});
+
+/**
+ * The documented one command, whose environment is empty.
+ *
+ * Every other server the suite starts is handed `SETTINGS_PATH`, which is what
+ * `@main/settings` passes to `electron-settings` as the directory to keep
+ * `settings.json` in. With nothing passed, `electron-settings` goes looking for
+ * the directory itself, by asking the `electron` package for the application —
+ * and it is a dependency resolved outside the alias, so what answers is the
+ * real one rather than `fake-electron.ts`, which has no application to give.
+ *
+ * So the suite has to start one server the way the README says to, with a home
+ * directory of its own to keep it out of the real one.
+ */
+test("starts with nothing in its environment, the way the README says to", async () => {
+  const home = path.join(resultDir, "home");
+  fs.ensureDirSync(home);
+
+  const { child, url } = await startServer(undefined, {
+    HOME: home,
+    USERPROFILE: home,
+  });
+
+  try {
+    const response = await fetch(`${url}/health`);
+    expect(response.status).toBe(200);
+
+    // Where it decided to keep them, which is the decision under test.
+    expect(fs.existsSync(path.join(home, ".config", "enjoy-local-web"))).toBe(
+      true
+    );
+  } finally {
+    child.kill();
+  }
 });
 
 test("runs in a plain Node process, without Electron", async () => {

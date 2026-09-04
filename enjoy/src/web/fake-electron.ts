@@ -62,10 +62,19 @@ export class ChannelNotFoundError extends Error {
 
 const home = os.homedir();
 
+/**
+ * The same directory `settings.json` is in, which `local.mjs` settles before
+ * any of this is imported. Read from the environment rather than recomputed, so
+ * that a run pointed somewhere else — every run under the tests — keeps its
+ * whole footprint there instead of scattering half of it into the real home.
+ */
+const userData =
+  process.env.SETTINGS_PATH || path.join(home, ".config", "enjoy-local-web");
+
 const paths: Record<string, string> = {
   home,
-  appData: path.join(home, ".config"),
-  userData: path.join(home, ".config", "enjoy-local-web"),
+  appData: path.dirname(userData),
+  userData,
   temp: os.tmpdir(),
   desktop: path.join(home, "Desktop"),
   documents: path.join(home, "Documents"),
@@ -73,7 +82,7 @@ const paths: Record<string, string> = {
   music: path.join(home, "Music"),
   pictures: path.join(home, "Pictures"),
   videos: path.join(home, "Videos"),
-  logs: path.join(home, ".config", "enjoy-local-web", "logs"),
+  logs: path.join(userData, "logs"),
 };
 
 export const app = {

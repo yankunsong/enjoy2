@@ -12,12 +12,31 @@
  * drive: its HTTP surface is the seam. `start.mjs` imports it and adds the
  * frontend on top.
  */
+import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createServer } from "vite";
 
 export const WEB_DIR = path.dirname(fileURLToPath(import.meta.url));
 export const PROJECT_ROOT = path.resolve(WEB_DIR, "../..");
+
+/**
+ * Where `settings.json` goes when `SETTINGS_PATH` says nothing.
+ *
+ * `@main/settings` hands that variable to `electron-settings` as the directory
+ * to keep the file in, and only when it is set. Left unset, `electron-settings`
+ * goes looking for a directory itself, by asking the `electron` package for the
+ * application — and it is a dependency, resolved outside the alias that puts
+ * `fake-electron.ts` in `electron`'s place, so what answers is the real package,
+ * which outside Electron has no application to give. The first read of a
+ * setting then throws, before the server has finished starting.
+ *
+ * Under the tests this is always set, so this is the one path they were not on:
+ * the documented `yarn workspace enjoy web`, whose environment is empty.
+ */
+export const settingsPath = () =>
+  process.env.SETTINGS_PATH || path.join(os.homedir(), ".config", "enjoy-local-web");
 
 /**
  * The path aliases both hosts share. The stand-ins each host swaps in are its
@@ -40,6 +59,11 @@ export const webApiAlias = () => [
 ];
 
 export const startLocalServer = async () => {
+  // Before Vite loads a line of main process source: `@main/settings` reads it
+  // as its module body runs, which is as early as anything here is imported.
+  process.env.SETTINGS_PATH = settingsPath();
+  fs.mkdirSync(process.env.SETTINGS_PATH, { recursive: true });
+
   const vite = await createServer({
     root: PROJECT_ROOT,
     configFile: false,

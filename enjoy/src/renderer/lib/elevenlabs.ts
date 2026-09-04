@@ -35,9 +35,14 @@ export const fetchElevenLabsVoices = async (
   const { voices = [] } = await response.json();
 
   return voices.map((voice: any) => ({
-    // The category tells a built-in voice from a cloned one, which is the
-    // difference worth seeing in a list that is otherwise just first names.
-    label: voice.category ? `${voice.name} (${voice.category})` : voice.name,
+    // The category is worth seeing only when it says something: an account's
+    // voices are nearly all `premade`, and a list where every row carries the
+    // same suffix is a list with a wasted column. A cloned or generated voice
+    // is the one you want to be able to pick out.
+    label:
+      voice.category && voice.category !== "premade"
+        ? `${voice.name} (${voice.category})`
+        : voice.name,
     value: voice.voice_id,
   }));
 };

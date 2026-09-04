@@ -129,6 +129,14 @@ const startHostedEnjoy = () =>
     });
   });
 
+const BLANK_CREDENTIALS = {
+  OPENAI_API_KEY: "",
+  OPENAI_BASE_URL: "",
+  AZURE_SPEECH_KEY: "",
+  AZURE_SPEECH_REGION: "",
+  ELEVENLABS_API_KEY: "",
+};
+
 /**
  * @param settingsPath where to keep `settings.json` and the Library, or
  *   `undefined` to leave both unset and let the server decide, which is what
@@ -150,6 +158,12 @@ const startServer = (
         ENJOY_YT_DLP_PATH: YT_DLP_STUB,
         YT_DLP_STUB_DIR: YT_DLP_DIR,
         WEB_API_URL: hostedEnjoyUrl,
+        // The suite owns the whole credential environment, so that the real
+        // `.env` beside the workspace — which the server now reads, and which
+        // on a developer's machine holds real keys — cannot reach a test.
+        // `process.loadEnvFile` fills gaps only, and an empty string is not a
+        // gap, so naming them here is what keeps the file out.
+        ...BLANK_CREDENTIALS,
         ...extraEnv,
       },
       stdio: ["ignore", "pipe", "pipe"],

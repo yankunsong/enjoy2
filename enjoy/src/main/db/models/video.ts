@@ -28,6 +28,7 @@ import fs from "fs-extra";
 import { t } from "i18next";
 import mainWindow from "@main/window";
 import log from "@main/logger";
+import { destroyEach } from "@main/db/destroy-each";
 import storage from "@main/storage";
 import Ffmpeg from "@main/ffmpeg";
 import { Client } from "@/api";
@@ -308,7 +309,7 @@ export class Video extends Model<Video> {
     if (video.filePath) {
       fs.remove(video.filePath);
     }
-    await Recording.destroyEach({
+    await destroyEach(Recording, {
       targetId: video.id,
       targetType: "Video",
     });

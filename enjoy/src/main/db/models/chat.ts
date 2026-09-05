@@ -15,6 +15,8 @@ import {
 } from "sequelize-typescript";
 import log from "@main/logger";
 import { ChatAgent, ChatMember, ChatMessage } from "@main/db/models";
+import { InstanceDestroyOptions } from "sequelize";
+import { destroyEach } from "@main/db/destroy-each";
 import mainWindow from "@main/window";
 import { t } from "i18next";
 import { ChatAgentTypeEnum, ChatTypeEnum } from "@/types/enums";
@@ -63,20 +65,21 @@ export class Chat extends Model<Chat> {
   @Column(DataType.JSON)
   config: any;
 
+  // What a deleted Chat takes with it is spelled out in `destroyContents`
+  // below, rather than left to `onDelete` on these associations: Sequelize's
+  // own cascade cannot let a member that will not go be logged and stepped
+  // over, and a Chat that cannot be deleted because one message under it is
+  // broken is worse than a file left behind.
   @HasMany(() => ChatMessage, {
     foreignKey: "chatId",
     constraints: false,
-    onDelete: "CASCADE",
-    hooks: true,
   })
   messages: ChatMessage[];
 
   @HasMany(() => ChatMember, {
     foreignKey: "chatId",
     constraints: false,
-    onDelete: "CASCADE",
     onUpdate: "CASCADE",
-    hooks: true,
   })
   members: ChatMember[];
 
@@ -161,8 +164,24 @@ export class Chat extends Model<Chat> {
     }
   }
 
+  /**
+   * Members first, then whatever messages are left. Members first because a
+   * member takes its own messages with it, and Speeches and Recordings go under
+   * those; what is left over afterwards is the learner's own half of the
+   * conversation, which belongs to no member and holds the recordings of them
+   * shadowing it.
+   *
+   * The order also settles the goodbyes: a member says "X has left the chat" on
+   * its way out, and cannot tell being removed from a chat that stays from
+   * going down with the chat itself. Sweeping the chat's messages after its
+   * members takes those notices too, rather than leaving them in a chat nobody
+   * can open again.
+   */
   @AfterDestroy
-  static async destroyMembers(chat: Chat) {
-    ChatMember.destroy({ where: { chatId: chat.id } });
+  static async destroyContents(chat: Chat, options?: InstanceDestroyOptions) {
+    const transaction = options?.transaction;
+
+    await destroyEach(ChatMember, { chatId: chat.id }, { transaction });
+    await destroyEach(ChatMessage, { chatId: chat.id }, { transaction });
   }
 }

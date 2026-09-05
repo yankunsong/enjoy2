@@ -28,6 +28,7 @@ import fs from "fs-extra";
 import { t } from "i18next";
 import mainWindow from "@main/window";
 import log from "@main/logger";
+import { destroyEach } from "@main/db/destroy-each";
 import storage from "@main/storage";
 import Ffmpeg from "@main/ffmpeg";
 import { Client } from "@/api";
@@ -286,7 +287,7 @@ export class Audio extends Model<Audio> {
     if (audio.filePath) {
       fs.remove(audio.filePath);
     }
-    await Recording.destroyEach({
+    await destroyEach(Recording, {
       targetId: audio.id,
       targetType: "Audio",
     });

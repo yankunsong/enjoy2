@@ -15,7 +15,6 @@ import {
   BeforeSave,
 } from "sequelize-typescript";
 import mainWindow from "@main/window";
-import log from "@main/logger";
 import {
   Chat,
   ChatAgent,
@@ -23,13 +22,14 @@ import {
   Recording,
   Speech,
 } from "@main/db/models";
+import { CreateOptions, InstanceDestroyOptions } from "sequelize";
+import { destroyEach } from "@main/db/destroy-each";
 import {
   ChatMessageCategoryEnum,
   ChatMessageRoleEnum,
   ChatMessageStateEnum,
 } from "@/types/enums";
 
-const logger = log.scope("db/models/chat-message");
 @Table({
   modelName: "ChatMessage",
   tableName: "chat_messages",
@@ -158,12 +158,21 @@ export class ChatMessage extends Model<ChatMessage> {
     chatMessage.agentId = member.userId;
   }
 
+  /**
+   * `transaction` is carried through because a message can be created inside
+   * one — the goodbye a leaving member posts, when the ChatAgent behind it is
+   * being deleted. On SQLite these two writes would otherwise be answered
+   * `SQLITE_BUSY` by the database that delete has already locked, and neither
+   * is awaited, so nothing would say the timestamps had not moved.
+   */
   @AfterCreate
-  static async updateChat(chatMessage: ChatMessage) {
-    const chat = await Chat.findByPk(chatMessage.chatId);
+  static async updateChat(chatMessage: ChatMessage, options?: CreateOptions) {
+    const transaction = options?.transaction;
+
+    const chat = await Chat.findByPk(chatMessage.chatId, { transaction });
     if (chat) {
       chat.changed("updatedAt", true);
-      chat.update({ updatedAt: new Date() }, { hooks: false });
+      chat.update({ updatedAt: new Date() }, { hooks: false, transaction });
     }
 
     const member = await ChatMember.findByPk(chatMessage.memberId, {
@@ -172,10 +181,14 @@ export class ChatMessage extends Model<ChatMessage> {
           association: ChatMember.associations.agent,
         },
       ],
+      transaction,
     });
     if (member?.agent) {
       member.agent.changed("updatedAt", true);
-      member.agent.update({ updatedAt: new Date() }, { hooks: false });
+      member.agent.update(
+        { updatedAt: new Date() },
+        { hooks: false, transaction }
+      );
     }
   }
 
@@ -214,23 +227,18 @@ export class ChatMessage extends Model<ChatMessage> {
 
   /**
    * What hangs off a message: the Speech that says it, and the Recordings of
-   * somebody shadowing it. Both go one at a time, and awaited, for the reason
-   * they do everywhere else: a bulk destroy fires only the bulk hooks, so the
-   * file-removing hook never runs and the file stays in the Library with
-   * nothing pointing at it.
+   * somebody shadowing it. The transaction is the one the message is being
+   * destroyed in — a Chat or a ChatAgent above it going away — and is carried
+   * down so the files under those records go too; `destroyEach` says why.
    */
   @AfterDestroy
-  static async destroySpeechesAndRecordings(chatMessage: ChatMessage) {
-    await Recording.destroyEach({ targetId: chatMessage.id });
+  static async destroySpeechesAndRecordings(
+    chatMessage: ChatMessage,
+    options?: InstanceDestroyOptions
+  ) {
+    const transaction = options?.transaction;
 
-    const speeches = await Speech.findAll({
-      where: { sourceId: chatMessage.id },
-    });
-
-    for (const speech of speeches) {
-      await speech.destroy().catch((err: Error) => {
-        logger.error("failed to destroy speech:", err.message);
-      });
-    }
+    await destroyEach(Recording, { targetId: chatMessage.id }, { transaction });
+    await destroyEach(Speech, { sourceId: chatMessage.id }, { transaction });
   }
 }

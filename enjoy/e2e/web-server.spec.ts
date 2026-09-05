@@ -116,6 +116,38 @@ const SAMPLE_CHAT_RECORDING = path.join(
   "chat-recording.mp3"
 );
 
+// The pair of files hanging off the chat that gets deleted whole: what one
+// agent's message was spoken with, and what the learner recorded against their
+// own message in the same chat. Bytes of their own, for the same two reasons —
+// a Speech's file goes only when the last Speech naming it does, and recording
+// deduplicates by content globally rather than per message.
+const SAMPLE_DOOMED_CHAT_SPEECH = path.join(
+  process.cwd(),
+  "test-results",
+  "doomed-chat-speech.mp3"
+);
+
+const SAMPLE_DOOMED_CHAT_RECORDING = path.join(
+  process.cwd(),
+  "test-results",
+  "doomed-chat-recording.mp3"
+);
+
+// The same pair again, for the chat the deleted ChatAgent is a member of. The
+// ChatAgent path deletes down hooks of its own, so it needs a chat of its own
+// to delete from, and files of its own for the same two reasons.
+const SAMPLE_AGENT_CHAT_SPEECH = path.join(
+  process.cwd(),
+  "test-results",
+  "agent-chat-speech.mp3"
+);
+
+const SAMPLE_AGENT_CHAT_RECORDING = path.join(
+  process.cwd(),
+  "test-results",
+  "agent-chat-recording.mp3"
+);
+
 // The Media deleted to check the same rule on the Video path, and the Recording
 // made against it. Both need content of their own, for the same two reasons:
 // importing a Media deduplicates by content, and so does recording.
@@ -320,6 +352,10 @@ test.beforeAll(async () => {
   fs.outputFileSync(SAMPLE_SHARED_DOCUMENT, `${SHARED_TEXT}\n`);
   buildAudio(SAMPLE_DIARY_RECORDING, 2);
   buildAudio(SAMPLE_CHAT_RECORDING, 8);
+  buildAudio(SAMPLE_DOOMED_CHAT_SPEECH, 10);
+  buildAudio(SAMPLE_DOOMED_CHAT_RECORDING, 11);
+  buildAudio(SAMPLE_AGENT_CHAT_SPEECH, 12);
+  buildAudio(SAMPLE_AGENT_CHAT_RECORDING, 13);
   buildVideo(SAMPLE_DOOMED_VIDEO, 3);
   buildAudio(SAMPLE_VIDEO_RECORDING, 9);
   buildSampleLongStereo();
@@ -1852,31 +1888,27 @@ test("deletes a Diary that was never spoken, rather than failing", async () => {
  * the rest, because that is where the handlers answer.
  */
 
-const CHAT_SPOKEN_TEXT = "Every boat came back before the weather turned.";
-
-let leavingMemberId: string;
-let spokenChatMessageId: string;
-let chatSpeech: any;
-let chatRecording: any;
-
-test("stands a chat up with two agents, and a spoken message from one", async () => {
+/**
+ * A chat to delete something out of. Two agents, because a chat refuses to lose
+ * its last one: a member can only be removed if somebody stays behind, and a
+ * ChatAgent can only leave a chat that survives it if the same is true.
+ */
+const chatWithTwoAgents = async (name: string) => {
   const agents = [];
-  for (const name of ["Leaving", "Staying"]) {
+  for (const suffix of ["one", "two"]) {
     const created = await ipc("chat-agents-create", {
-      name,
+      name: `${name} ${suffix}`,
       type: "GPT",
       language: "en-US",
-      description: `${name} agent`,
+      description: `${name} ${suffix}`,
       config: { prompt: "Talk about the harbour." },
     });
     expect(created.status).toBe(200);
     agents.push(created.body.result);
   }
 
-  // Two agents, because a chat refuses to lose its last one: the member under
-  // test can only leave if somebody stays behind.
   const chat = await ipc("chats-create", {
-    name: "The harbour",
+    name,
     config: { sttEngine: "whisper" },
     members: agents.map((agent: any) => ({
       userId: agent.id,
@@ -1891,12 +1923,25 @@ test("stands a chat up with two agents, and a spoken message from one", async ()
       where: { chatId: chat.body.result.id },
     })
   ).body.result;
+
+  return { chatId: chat.body.result.id, agents, members };
+};
+
+const CHAT_SPOKEN_TEXT = "Every boat came back before the weather turned.";
+
+let leavingMemberId: string;
+let spokenChatMessageId: string;
+let chatSpeech: any;
+let chatRecording: any;
+
+test("stands a chat up with two agents, and a spoken message from one", async () => {
+  const { chatId, agents, members } = await chatWithTwoAgents("The harbour");
   leavingMemberId = members.find(
     (member: any) => member.userId === agents[0].id
   ).id;
 
   const message = await ipc("chat-messages-create", {
-    chatId: chat.body.result.id,
+    chatId,
     memberId: leavingMemberId,
     content: CHAT_SPOKEN_TEXT,
   });
@@ -1970,6 +2015,177 @@ test("takes the leaving member's messages, their Speeches and their files", asyn
   expect(fs.existsSync(await recordingFile(chatRecording.filename))).toBe(
     false
   );
+});
+
+/**
+ * The chat above went away one member at a time, which is how a member leaves.
+ * A chat goes away whole, and so does the ChatAgent a chat is with — two more
+ * paths down to the same messages, and so to the same Speeches and Recordings.
+ * Both are asserted here because neither reaches the other: a Chat destroys its
+ * members, a ChatAgent destroys its memberships, and the messages under either
+ * are the learner's own audio and the agent's.
+ */
+
+const DOOMED_CHAT_AGENT_TEXT = "The tide turns twice before anyone notices.";
+const DOOMED_CHAT_USER_TEXT = "I said it back, slower.";
+
+let doomedChatId: string;
+let doomedChatMemberIds: string[];
+let doomedChatMessageIds: string[];
+let doomedChatSpeech: any;
+let doomedChatRecording: any;
+
+test("stands up a chat to delete whole, spoken by an agent and by the learner", async () => {
+  const { chatId, members } = await chatWithTwoAgents("The doomed harbour");
+  doomedChatId = chatId;
+  doomedChatMemberIds = members.map((member: any) => member.id);
+
+  // One message from an agent, which owns the Speech, and one from the learner,
+  // which owns the Recording — the two kinds of audio a chat holds, and neither
+  // of them reachable once the chat they were said in is gone.
+  const spoken = await ipc("chat-messages-create", {
+    chatId,
+    memberId: doomedChatMemberIds[0],
+    content: DOOMED_CHAT_AGENT_TEXT,
+  });
+  expect(spoken.status).toBe(200);
+
+  const said = await ipc("chat-messages-create", {
+    chatId,
+    content: DOOMED_CHAT_USER_TEXT,
+  });
+  expect(said.status).toBe(200);
+  doomedChatMessageIds = [spoken.body.result.id, said.body.result.id];
+
+  const speech = await ipc(
+    "speeches-create",
+    {
+      sourceId: spoken.body.result.id,
+      sourceType: "ChatMessage",
+      text: DOOMED_CHAT_AGENT_TEXT,
+      section: 0,
+      segment: 0,
+      configuration: VOICE,
+    },
+    blobOf(SAMPLE_DOOMED_CHAT_SPEECH, "audio/mp3")
+  );
+  expect(speech.status).toBe(200);
+  doomedChatSpeech = speech.body.result;
+
+  const recorded = await ipc("recordings-create", {
+    targetId: said.body.result.id,
+    targetType: "ChatMessage",
+    referenceId: 0,
+    referenceText: DOOMED_CHAT_USER_TEXT,
+    blob: blobOf(SAMPLE_DOOMED_CHAT_RECORDING, "audio/mpeg"),
+  });
+  expect(recorded.status).toBe(200);
+  doomedChatRecording = recorded.body.result;
+
+  expect(fs.existsSync(await speechFile(doomedChatSpeech.filename))).toBe(true);
+  expect(fs.existsSync(await recordingFile(doomedChatRecording.filename))).toBe(
+    true
+  );
+});
+
+test("takes a deleted Chat's members, their messages and every file under them", async () => {
+  const destroyed = await ipc("chats-destroy", doomedChatId);
+  expect(destroyed.status).toBe(200);
+
+  // Read once rather than polled, as the member's own removal is above: the
+  // chat has to be empty by the time it is answered as deleted, not shortly
+  // afterwards.
+  const members = await ipc("chat-members-find-all", {
+    where: { chatId: doomedChatId },
+  });
+  expect(members.body.result).toHaveLength(0);
+
+  const messages = await ipc("chat-messages-find-all", {
+    where: { chatId: doomedChatId },
+  });
+  expect(messages.body.result).toHaveLength(0);
+
+  const speech = await ipc("speeches-find-one", {
+    sourceId: doomedChatMessageIds[0],
+    sourceType: "ChatMessage",
+  });
+  expect(speech.body.result).toBeNull();
+
+  const recordings = await ipc("recordings-find-all", {
+    where: { targetId: doomedChatMessageIds[1], targetType: "ChatMessage" },
+  });
+  expect(recordings.body.result).toHaveLength(0);
+
+  expect(fs.existsSync(await speechFile(doomedChatSpeech.filename))).toBe(
+    false
+  );
+  expect(fs.existsSync(await recordingFile(doomedChatRecording.filename))).toBe(
+    false
+  );
+});
+
+test("takes them down the ChatAgent path too, which deletes through hooks of its own", async () => {
+  const { chatId, agents, members } = await chatWithTwoAgents("The other harbour");
+
+  const leavingMemberId = members.find(
+    (member: any) => member.userId === agents[0].id
+  ).id;
+
+  const spoken = await ipc("chat-messages-create", {
+    chatId,
+    memberId: leavingMemberId,
+    content: DOOMED_CHAT_AGENT_TEXT,
+  });
+  expect(spoken.status).toBe(200);
+
+  const speech = await ipc(
+    "speeches-create",
+    {
+      sourceId: spoken.body.result.id,
+      sourceType: "ChatMessage",
+      text: DOOMED_CHAT_AGENT_TEXT,
+      section: 0,
+      segment: 0,
+      configuration: VOICE,
+    },
+    blobOf(SAMPLE_AGENT_CHAT_SPEECH, "audio/mp3")
+  );
+  expect(speech.status).toBe(200);
+
+  const recorded = await ipc("recordings-create", {
+    targetId: spoken.body.result.id,
+    targetType: "ChatMessage",
+    referenceId: 0,
+    referenceText: DOOMED_CHAT_AGENT_TEXT,
+    blob: blobOf(SAMPLE_AGENT_CHAT_RECORDING, "audio/mpeg"),
+  });
+  expect(recorded.status).toBe(200);
+
+  const speechPath = await speechFile(speech.body.result.filename);
+  const recordingPath = await recordingFile(recorded.body.result.filename);
+  expect(fs.existsSync(speechPath)).toBe(true);
+  expect(fs.existsSync(recordingPath)).toBe(true);
+
+  const destroyed = await ipc("chat-agents-destroy", agents[0].id);
+  expect(destroyed.status).toBe(200);
+
+  // The chat itself stays: a second agent is still in it. What goes is the
+  // membership the deleted agent held, and everything that hung off it.
+  const chat = await ipc("chats-find-one", { where: { id: chatId } });
+  expect(chat.body.result).not.toBeNull();
+
+  const remaining = await ipc("chat-members-find-all", {
+    where: { chatId, userId: agents[0].id },
+  });
+  expect(remaining.body.result).toHaveLength(0);
+
+  const message = await ipc("chat-messages-find-one", {
+    id: spoken.body.result.id,
+  });
+  expect(message.body.result).toBeNull();
+
+  expect(fs.existsSync(speechPath)).toBe(false);
+  expect(fs.existsSync(recordingPath)).toBe(false);
 });
 
 test("reached Hosted Enjoy at no point along the way", async () => {

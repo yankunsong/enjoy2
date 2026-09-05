@@ -31,7 +31,7 @@ import storage from "@main/storage";
 import { Client } from "@/api";
 import echogarden from "@main/echogarden";
 import { t } from "i18next";
-import { Attributes, Op, Transaction, WhereOptions } from "sequelize";
+import { Attributes, Op, Transaction } from "sequelize";
 import { v5 as uuidv5 } from "uuid";
 import FfmpegWrapper from "@main/ffmpeg";
 import { MIME_TYPES } from "@/constants";
@@ -322,31 +322,6 @@ export class Recording extends Model<Recording> {
     webApi.deleteRecording(recording.id).catch((err) => {
       logger.error("deleteRecording failed:", err.message);
     });
-  }
-
-  /**
-   * Destroy every Recording matching `where`, one at a time and awaited. Every
-   * path that owns Recordings owns a set of them, so this is what those paths
-   * call instead of `Recording.destroy`.
-   *
-   * One at a time because a bulk destroy fires only the bulk hooks: with it,
-   * `cleanupFile` never runs, and the audio the learner recorded stays in the
-   * Library with nothing left that can reach it. Awaited so that whatever owned
-   * them — a Media, a chat message — is not answered as deleted while its
-   * Recordings are still on their way out.
-   *
-   * A Recording that will not go is logged rather than thrown, as a Speech
-   * already is: a file left behind is not a reason to refuse to delete the
-   * thing that owned it.
-   */
-  static async destroyEach(where: WhereOptions<Attributes<Recording>>) {
-    const recordings = await Recording.findAll({ where });
-
-    for (const recording of recordings) {
-      await recording.destroy().catch((err: Error) => {
-        logger.error("failed to destroy recording:", err.message);
-      });
-    }
   }
 
   static async createFromBlob(

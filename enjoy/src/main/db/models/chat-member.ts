@@ -12,12 +12,12 @@ import {
   AllowNull,
   Scopes,
 } from "sequelize-typescript";
-import log from "@main/logger";
 import { Chat, ChatAgent, ChatMessage } from "@main/db/models";
 import mainWindow from "@main/window";
+import { InstanceDestroyOptions } from "sequelize";
+import { destroyEach } from "@main/db/destroy-each";
 import { ChatMessageCategoryEnum, ChatMessageRoleEnum } from "@/types/enums";
 
-const logger = log.scope("db/models/chat-member");
 @Table({
   modelName: "ChatMember",
   tableName: "chat_members",
@@ -116,30 +116,39 @@ export class ChatMember extends Model<ChatMember> {
    * are leaving the open chat, and a renderer that is not told keeps drawing
    * them until something else reloads the chat. So the notification is the
    * point, not the cost.
+   *
+   * The removing transaction is carried down every query here. A member is
+   * removed inside one whenever the ChatAgent it stands for is deleted, and on
+   * SQLite a query left outside that transaction is answered `SQLITE_BUSY` by
+   * the database the delete has already locked — a failure `destroyEach` logs
+   * and steps over, leaving the messages behind.
    */
   @AfterDestroy
-  static async destroyMessages(member: ChatMember) {
-    const messages = await ChatMessage.findAll({
-      where: { memberId: member.id },
-    });
+  static async destroyMessages(
+    member: ChatMember,
+    options?: InstanceDestroyOptions
+  ) {
+    const transaction = options?.transaction;
 
-    for (const message of messages) {
-      await message.destroy().catch((err: Error) => {
-        logger.error("failed to destroy chat message:", err.message);
-      });
-    }
+    await destroyEach(ChatMessage, { memberId: member.id }, { transaction });
 
-    ChatAgent.findByPk(member.userId).then((chatAgent) => {
-      if (!chatAgent) return;
+    // Said even when the whole chat is going, where it is not wanted: a member
+    // cannot tell that case from a real departure — its chat's own row is still
+    // there when this runs. `Chat.destroyContents` sweeps the chat's messages
+    // after its members for that reason, which takes these with them.
+    const chatAgent = await ChatAgent.findByPk(member.userId, { transaction });
+    if (!chatAgent) return;
 
-      ChatMessage.create({
+    await ChatMessage.create(
+      {
         chatId: member.chatId,
         content: `${chatAgent.name} has left the chat.`,
         agentId: chatAgent.id,
         role: ChatMessageRoleEnum.SYSTEM,
         category: ChatMessageCategoryEnum.MEMBER_LEFT,
-      });
-    });
+      },
+      { transaction }
+    );
   }
 
   @AfterCreate

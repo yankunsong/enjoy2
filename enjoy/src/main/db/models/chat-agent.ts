@@ -15,6 +15,8 @@ import {
 import mainWindow from "@main/window";
 import log from "@main/logger";
 import { Chat, ChatMember, ChatMessage, UserSetting } from "@main/db/models";
+import { InstanceDestroyOptions } from "sequelize";
+import { destroyEach } from "@main/db/destroy-each";
 import {
   ChatAgentTypeEnum,
   ChatMessageRoleEnum,
@@ -54,11 +56,11 @@ export class ChatAgent extends Model<ChatAgent> {
   @Column(DataType.JSON)
   config: any;
 
+  // Spelled out in `destroyMembers` below rather than left to `onDelete`, for
+  // the reason it is on `Chat.members`.
   @HasMany(() => ChatMember, {
     foreignKey: "userId",
     constraints: false,
-    onDelete: "CASCADE",
-    hooks: true,
   })
   members: ChatMember[];
 
@@ -102,9 +104,26 @@ export class ChatAgent extends Model<ChatAgent> {
     }
   }
 
+  /**
+   * A deleted agent leaves every chat it was in, which is a real departure —
+   * the chats themselves stay, with the other agents still in them — so the
+   * goodbye each membership posts is wanted here, unlike on `Chat`'s own way
+   * out.
+   *
+   * `destroyEach` rather than a bulk destroy, so that
+   * `ChatMember.destroyMessages` runs on each membership and the messages this
+   * agent spoke go with it, down to the Speech and Recording files under them.
+   */
   @AfterDestroy
-  static destroyMembers(chatAgent: ChatAgent) {
-    ChatMember.destroy({ where: { userId: chatAgent.id } });
+  static async destroyMembers(
+    chatAgent: ChatAgent,
+    options?: InstanceDestroyOptions
+  ) {
+    await destroyEach(
+      ChatMember,
+      { userId: chatAgent.id },
+      { transaction: options?.transaction }
+    );
   }
 
   // Migrate old data structure before v0.6.0 to new data structure
@@ -202,6 +221,10 @@ export class ChatAgent extends Model<ChatAgent> {
           }
         );
       }
+      // The one member destroy that may skip its hooks: the loop above has
+      // just moved this member's messages onto the user, so
+      // `destroyMessages` would find and delete the very messages this
+      // migration exists to keep.
       await member.destroy({ transaction: tx, hooks: false });
     }
     await tx.commit();

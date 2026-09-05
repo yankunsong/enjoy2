@@ -151,10 +151,17 @@ trying.
 Both credentials are stored as plain JSON in the local database, beside the
 OpenAI key and on the same reasoning: one user, loopback only.
 
+Two preferences steer what is asked for, both off by default and both for the
+same reason — an Assessment is a paid call, and a shadowing session throws away
+most of its takes. `autoAssess` scores a Recording as it is made rather than
+when the button is pressed. `assessProsody` asks for prosody as well, which is
+an enhanced add-on billed on top of the assessment and offered in en-US alone;
+the locale is settled before the request rather than after it.
+
 ## Shadowing
 
 Looping a sentence, recording against it and comparing the two waveforms is the
-renderer's, unchanged. What Local Web Enjoy adds under it is the bytes: two runs
+renderer's. What Local Web Enjoy adds under it is the bytes: two runs
 of them cross the seam on this path and neither is a file, so both travel inside
 the argument list — the recording the microphone made, and the audio Alignment
 reads to produce the Timeline the sentences are drawn from. Under Electron both
@@ -166,6 +173,13 @@ waveform under it is drawn from `GET /media/`, byte ranges and all.
 
 The record button's microphone gate is the browser's own — see
 `browser/electron-only.ts`.
+
+The comparison the two contours are drawn for is also scored, and that scoring
+runs here as readily as under Electron: Likeness reads the two pitch contours
+the waveforms already carry, so it costs no audio processing and asks nothing of
+the network or of an account. It is the half of shadowing an Assessment cannot
+see — see **Likeness** in [`CONTEXT.md`](../../CONTEXT.md) for what it claims to
+measure and `src/likeness.ts` for how.
 
 None of it reaches Hosted Enjoy. The models sync every record they save, and
 `fake-web-api.ts` is what they sync to.

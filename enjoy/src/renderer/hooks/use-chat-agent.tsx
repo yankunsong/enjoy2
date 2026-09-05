@@ -81,7 +81,7 @@ export const useChatAgent = () => {
     fetchChatAgents();
     addDblistener(onChatAgentUpdate);
 
-    () => {
+    return () => {
       removeDbListener(onChatAgentUpdate);
     };
   }, []);

@@ -62,7 +62,6 @@ export const PostAudio = (props: {
         new RegExp("^(" + STORAGE_WORKER_ENDPOINTS.join("|") + ")")
       ) ? (
         <WavesurferPlayer
-          currentTime={currentTime}
           setCurrentTime={setCurrentTime}
           id={audio.id}
           src={audio.sourceUrl}

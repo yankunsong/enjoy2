@@ -163,7 +163,6 @@ export const ConversationForm = (props: {
 
   const form = useForm<z.infer<typeof conversationFormSchema>>({
     resolver: zodResolver(conversationFormSchema),
-    // @ts-ignore
     values: conversation?.id
       ? {
           name: conversation.name,
@@ -234,7 +233,7 @@ export const ConversationForm = (props: {
         configuration.type === "gpt" &&
         !gptProviders[engine]?.configurable.includes(key)
       ) {
-        // @ts-ignore
+        // @ts-expect-error -- key is a string, and the config is a union
         delete configuration[key];
       }
 
@@ -242,7 +241,7 @@ export const ConversationForm = (props: {
         configuration.type === "tts" &&
         !ttsProviders[engine]?.configurable.includes(key)
       ) {
-        // @ts-ignore
+        // @ts-expect-error -- key is a string, and the config is a union
         delete configuration.tts[key];
       }
     });
@@ -263,7 +262,7 @@ export const ConversationForm = (props: {
     const voice = configuration.tts.voice;
     const language = configuration.tts.language;
     if (!language) {
-      configuration.tts.language === learningLanguage;
+      configuration.tts.language = learningLanguage;
     }
     if (!ttsEngine) {
       configuration.tts.engine = "openai";

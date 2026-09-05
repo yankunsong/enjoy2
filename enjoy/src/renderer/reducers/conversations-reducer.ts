@@ -13,6 +13,7 @@ export const conversationsReducer = (
       } else if (action.records) {
         return [...state, ...action.records];
       }
+      return state;
     }
     case "create": {
       return [action.record, ...state];

@@ -3,6 +3,9 @@
 Monorepo with three Yarn workspaces: `enjoy` (Electron desktop app),
 `1000-hours` (VitePress book site), `1000h-portal` (Nuxt page generator).
 
+Read `AGENT.md` before any work in `enjoy`: this is a personal fork run only as
+Local Web Enjoy, and features are built and verified there alone.
+
 ## Agent skills
 
 ### Issue tracker

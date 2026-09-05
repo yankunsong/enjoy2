@@ -209,9 +209,20 @@ export const AISettingsProvider = ({
     const _gptEngine = await EnjoyApp.userSettings.get(
       UserSettingKeyEnum.GPT_ENGINE
     );
-    if (_gptEngine) {
+    if (_gptEngine && !(isLocalWebEnjoy && _gptEngine.name === "enjoyai")) {
       setGptEngine(_gptEngine);
-    } else if (_openai?.key) {
+    } else if (_openai?.key || isLocalWebEnjoy) {
+      // `enjoyai` is the engine a first run stores before any key has arrived,
+      // and it outlives the key: the stored value is read back first, so a
+      // later `OPENAI_API_KEY` never dislodges it. Here that engine has no
+      // account behind it, and the commands built on it — translate, analyze,
+      // lookup — go out with an undefined key to Hosted Enjoy's `/api/ai` and
+      // come back saying the OpenAI key is missing, which is a true sentence
+      // about the wrong setting. So the same rewrite the STT engine and the
+      // TTS config already do: replace it with the one engine this
+      // distribution can run, rather than ignore it and fail at the point of
+      // use. Without a key that engine still fails, but it fails naming the
+      // key the user has to set.
       const engine = {
         name: "openai",
         models: {
@@ -268,8 +279,13 @@ export const AISettingsProvider = ({
         currentGptEngine:
           gptEngine.name === "openai"
             ? Object.assign(gptEngine, {
-                key: openai.key,
-                baseUrl: openai.baseUrl,
+                // Optional, because the engine can now be selected while the
+                // settings behind it are still empty: the rewrite above picks
+                // it on a key's behalf that has not arrived yet. An undefined
+                // key reaches the command and is reported there; reading it
+                // off `null` here would take the whole provider down first.
+                key: openai?.key,
+                baseUrl: openai?.baseUrl,
               })
             : Object.assign(gptEngine, {
                 key: user?.accessToken,

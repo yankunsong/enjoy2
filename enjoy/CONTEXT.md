@@ -20,14 +20,26 @@ _Avoid_: collection, workspace
 **Diary**:
 A piece of text you wrote yourself, kept for practising against. Where a Media is
 imported, a Diary is authored: its Transcript exists before any audio does, and
-the audio is derived from the text by Speech synthesis.
-_Avoid_: note, document, journal, entry
+the audio is derived from the text by Speech synthesis. Where a Document is
+brought in and fixed, a Diary is expected to change.
+_Avoid_: journal, entry. Note and Document are terms of their own, not looser
+words for this one.
+
+**Document**:
+A piece of written material you imported to read: an epub, Markdown, HTML or
+plain-text file. Identified by the hash of the file it came from and never
+edited — only its title, reading position and settings change. Where a Media is
+imported to be practised against sentence by sentence, a Document is imported to
+be read, a paragraph at a time; each paragraph can be given a Speech, which is
+how a Document becomes something to shadow.
+_Avoid_: book, ebook, article, text, file
 
 **Speech**:
 Audio synthesised from a piece of text, addressed by its source and the text it
 speaks. The bridge from a Diary to something shadowable. Two sources saying the
 same thing in the same voice are two Speeches sharing one file, since a file is
-named by the hash of its own content.
+named by the hash of its own content. A Document's paragraph is spoken the same
+way.
 _Avoid_: TTS output, generated audio, voiceover
 
 **Transcript**:
@@ -61,6 +73,12 @@ _Avoid_: take, attempt, clip
 Phoneme-level scoring of a Recording against the sentence it shadows, producing
 accuracy, fluency and completeness scores.
 _Avoid_: evaluation, scoring, grading
+
+**Note**:
+Something you wrote about one sentence of a Media, kept attached to it. Where a
+Diary is a standalone piece of writing you practise against, a Note is an
+annotation on somebody else's sentence, and is never shadowed.
+_Avoid_: annotation, comment, memo
 
 ## Distributions
 

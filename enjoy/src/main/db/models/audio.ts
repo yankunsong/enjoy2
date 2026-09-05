@@ -344,7 +344,7 @@ export class Audio extends Model<Audio> {
         md5,
       },
     });
-    if (!!existing) {
+    if (existing) {
       logger.warn("Audio already exists:", existing.id, existing.name);
       existing.changed("updatedAt", true);
       existing.update({ updatedAt: new Date() });

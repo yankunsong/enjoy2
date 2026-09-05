@@ -6,7 +6,7 @@ export const Sentence = memo(
   ({ sentence, className }: { sentence: string; className?: string }) => {
     // split by space or punctuation
     // Sentence may be in other languages, so need to handle only English words
-    let words = sentence.split(/(\s+|[a-zA-Z]+)/);
+    const words = sentence.split(/(\s+|[a-zA-Z]+)/);
 
     return (
       <span className={cn("break-words align-middle", className)}>

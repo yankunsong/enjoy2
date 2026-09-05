@@ -23,6 +23,16 @@ import { enjoyUrlToPath, pathToEnjoyUrl } from "@main/utils";
 
 const logger = log.scope("db/handlers/recordings-handler");
 
+// What `recordings-stats` answers with: the aggregate row `stats` selects.
+// Naming it is what lets the `.then` state a return type, which TypeScript
+// cannot infer for a callback that returns the model it is reading. The empty
+// answer is `null` rather than `[]`, because `[]` is what the one caller's
+// `if (!stats)` guard would let through and then read a `count` off.
+type RecordingStats = {
+  count: number;
+  duration: number;
+};
+
 class RecordingsHandler {
   private async findAll(
     event: IpcMainEvent,
@@ -204,11 +214,13 @@ class RecordingsHandler {
       ],
       where,
     })
-      .then((stats) => {
+      .then((stats): RecordingStats | null => {
         if (!stats) {
-          return [];
+          return null;
         }
-        return stats.toJSON();
+        // The row is an aggregate, not a Recording, so `toJSON`'s own type
+        // parameter (bounded by the model) cannot describe it.
+        return stats.toJSON() as unknown as RecordingStats;
       })
       .catch((err) => {
         event.sender.send("on-notification", {

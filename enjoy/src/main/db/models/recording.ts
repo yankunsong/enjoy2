@@ -302,7 +302,9 @@ export class Recording extends Model<Recording> {
   static async createFromBlob(
     blob: {
       type: string;
-      arrayBuffer: ArrayBuffer;
+      // A renderer hands over a Blob's ArrayBuffer; the main process reads a
+      // Buffer off disk. `ensureRawAudio` takes either.
+      arrayBuffer: ArrayBuffer | Buffer;
     },
     params: Partial<Attributes<Recording>>,
     transaction?: Transaction
@@ -314,8 +316,10 @@ export class Recording extends Model<Recording> {
       throw new Error(t("models.recording.cannotDetectAnySound"));
     }
 
-    let rawAudio = await echogarden.ensureRawAudio(
-      Buffer.from(blob.arrayBuffer)
+    const rawAudio = await echogarden.ensureRawAudio(
+      Buffer.isBuffer(blob.arrayBuffer)
+        ? blob.arrayBuffer
+        : Buffer.from(blob.arrayBuffer)
     );
 
     // trim audio

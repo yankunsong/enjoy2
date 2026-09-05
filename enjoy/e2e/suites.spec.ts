@@ -1,8 +1,8 @@
 import { expect, test } from "@playwright/test";
 import fs from "fs";
 import path from "path";
-import { fileURLToPath } from "url";
 import config from "../playwright.config";
+import { enjoyRoot, scripts, stepsRunning } from "./workflow";
 
 /**
  * The path from a spec file to a CI run, checked at every joint.
@@ -25,16 +25,7 @@ import config from "../playwright.config";
  * it without anybody saying so.
  */
 
-const enjoyRoot = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
-const repoRoot = path.join(enjoyRoot, "..");
-
 const E2E_DIR = path.join(enjoyRoot, "e2e");
-const WORKFLOW = path.join(
-  repoRoot,
-  ".github",
-  "workflows",
-  "test-enjoy-app.yml"
-);
 
 type Pattern = string | RegExp;
 
@@ -68,30 +59,11 @@ const specFiles = () =>
     .map(String)
     .filter((entry) => entry.endsWith(".spec.ts"));
 
-/**
- * The workflow read as the steps it would actually run: one string per `- ` at
- * step indentation, with commented-out lines dropped first. Both halves matter.
- * A step parked behind a `#` is a step CI does not run, and a step is the unit
- * `continue-on-error` applies to — asked of the file as a whole, the question
- * cannot tell which step was let off.
- */
-const workflowSteps = () =>
-  fs
-    .readFileSync(WORKFLOW, "utf-8")
-    .split("\n")
-    .filter((line) => !line.trimStart().startsWith("#"))
-    .join("\n")
-    .split(/^      - /m)
-    .slice(1);
-
 /** The scripts that run a Playwright project, which is to say a whole suite. */
 const suiteScripts = (enjoyScripts: Record<string, string>) =>
   Object.entries(enjoyScripts)
     .filter(([, script]) => script.includes("--project="))
     .map(([name]) => name);
-
-const scripts = (packageJson: string): Record<string, string> =>
-  JSON.parse(fs.readFileSync(packageJson, "utf-8")).scripts ?? {};
 
 test("claims every spec in the directory for exactly one project", () => {
   const unclaimed: string[] = [];
@@ -136,19 +108,12 @@ test("runs every project from a script of its own", () => {
 
 test("calls every one of those scripts from the workflow, as a gate", () => {
   const enjoyScripts = scripts(path.join(enjoyRoot, "package.json"));
-  const rootScripts = scripts(path.join(repoRoot, "package.json"));
-  const steps = workflowSteps();
 
   const uncalled: string[] = [];
   const ungated: string[] = [];
 
   for (const name of suiteScripts(enjoyScripts)) {
-    const fromRoot = Object.entries(rootScripts).find(([, script]) =>
-      script.includes(`workspace enjoy ${name}`)
-    );
-    const running = fromRoot
-      ? steps.filter((step) => step.includes(`yarn ${fromRoot[0]}`))
-      : [];
+    const running = stepsRunning(name);
 
     if (running.length === 0) uncalled.push(name);
     if (running.some((step) => step.includes("continue-on-error: true")))

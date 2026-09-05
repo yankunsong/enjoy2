@@ -253,7 +253,7 @@ type EnjoyAppType = {
     stats: (params: { from: string; to: string }) => Promise<{
       count: number;
       duration: number;
-    }>;
+    } | null>;
     groupByDate: (params: { from: string; to: string }) => Promise<
       {
         date: string;
@@ -375,7 +375,10 @@ type EnjoyAppType = {
     set: (key: string, value: any, ttl?: number) => Promise<void>;
     delete: (key: string) => Promise<void>;
     clear: () => Promise<void>;
-    writeFile: (filename: string, data: Buffer<ArrayBuffer>) => Promise<string>;
+    writeFile: (
+      filename: string,
+      data: ArrayBuffer | Buffer
+    ) => Promise<string>;
   };
   transcriptions: {
     findOrCreate: (params: any) => Promise<TranscriptionType>;

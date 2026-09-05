@@ -134,7 +134,7 @@ export const TranscriptionCreateForm = (props: {
     // Remove all lines with only spaces
     return text
       .replace(
-        /(\d{2}:\d{2}:\d{2}[,\.]\d{3}(\s+-->\s+\d{2}:\d{2}:\d{2}[,\.]\d{3})?)\s+/g,
+        /(\d{2}:\d{2}:\d{2}[,.]\d{3}(\s+-->\s+\d{2}:\d{2}:\d{2}[,.]\d{3})?)\s+/g,
         ""
       )
       .replace(/#.*\n/g, "")

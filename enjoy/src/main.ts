@@ -160,5 +160,7 @@ app.on("activate", () => {
 app.on("before-quit", () => {
   try {
     fs.emptyDirSync(settings.cachePath());
-  } catch (err) {}
+  } catch (err) {
+    // Quitting anyway; a cache we could not empty is not worth blocking on.
+  }
 });

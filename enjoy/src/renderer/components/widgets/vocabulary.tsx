@@ -11,7 +11,7 @@ export const Vocabulary = memo(
     context?: string;
     children?: React.ReactNode;
   }) => {
-    let [timer, setTimer] = useState<ReturnType<typeof setTimeout>>();
+    const [timer, setTimer] = useState<ReturnType<typeof setTimeout>>();
     const { vocabularyConfig, EnjoyApp } = useContext(
       AppSettingsProviderContext
     );
@@ -30,7 +30,7 @@ export const Vocabulary = memo(
     };
 
     const handleMouseEnter = (e: any) => {
-      let _timer = setTimeout(() => {
+      const _timer = setTimeout(() => {
         if (!context) {
           context = e.target?.parentElement
             .closest(".sentence, h2, p, div")

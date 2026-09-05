@@ -245,7 +245,7 @@ export class Speech extends Model<Speech> {
     const openai = new OpenAI({
       ...openaiConfig,
       httpAgent,
-      // @ts-ignore
+      // @ts-expect-error -- the proxy agent's fetch is not OpenAI's fetch type
       fetch,
     });
 

@@ -41,7 +41,7 @@ export class MDictHandler {
     const mdx = mdxs[0];
     const hash = await hashFile(mdx, { algo: "md5" });
 
-    for (let _path of pathes) {
+    for (const _path of pathes) {
       await fs.copy(
         _path,
         path.join(this.dictsPath, hash, path.basename(_path))
@@ -65,7 +65,7 @@ export class MDictHandler {
       this.mdx = new MdictReader(mdict.mdx);
     }
 
-    let result = this.mdx.lookup(word)?.definition ?? null;
+    const result = this.mdx.lookup(word)?.definition ?? null;
 
     if (result?.startsWith("@@@LINK=")) {
       return this.lookup(result.substring(8), mdict);
@@ -98,7 +98,7 @@ export class MDictHandler {
     }
 
     try {
-      for (let _path of mdict.mdds) {
+      for (const _path of mdict.mdds) {
         if (!this.mdds[_path]) {
           this.mdds[_path] = new MdictReader(_path);
         }

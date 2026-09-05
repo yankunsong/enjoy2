@@ -1,11 +1,13 @@
 import { useEffect, useState, useRef, useCallback } from "react";
-import { renderPitchContour } from "@renderer/lib/utils";
+import {
+  renderPitchContour,
+  secondsToTimestamp,
+} from "@renderer/lib/utils";
 import { extractFrequencies } from "@/utils";
 import WaveSurfer from "wavesurfer.js";
 import { Button, Skeleton } from "@renderer/components/ui";
 import { PlayIcon, PauseIcon } from "lucide-react";
 import { useIntersectionObserver } from "@uidotdev/usehooks";
-import { secondsToTimestamp } from "@renderer/lib/utils";
 
 export const SpeechPlayer = (props: {
   speech: Partial<SpeechType>;

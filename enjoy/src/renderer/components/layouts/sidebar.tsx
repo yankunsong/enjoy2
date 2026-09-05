@@ -39,10 +39,9 @@ import { useLocation, Link, useNavigate } from "react-router-dom";
 import { t } from "i18next";
 import { Preferences } from "@renderer/components";
 import { AppSettingsProviderContext } from "@renderer/context";
-import { useContext, useEffect } from "react";
+import { useContext, useEffect, useState } from "react";
 import { isLocalWebEnjoy } from "@/distribution";
 import { NoticiationsChannel } from "@renderer/cables";
-import { useState } from "react";
 
 export const Sidebar = (props: {
   isCollapsed: boolean;

@@ -16,7 +16,7 @@ export const AudioPlayer = (props: {
   const { audio } = useAudio({ id, md5 });
 
   const updateCurrentSegmentIndex = async () => {
-    let index = segmentIndex || (await getCachedSegmentIndex());
+    const index = segmentIndex || (await getCachedSegmentIndex());
     setCurrentSegmentIndex(index);
   };
 

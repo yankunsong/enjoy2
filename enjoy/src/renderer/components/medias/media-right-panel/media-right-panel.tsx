@@ -9,13 +9,14 @@ import {
   TabsTrigger,
   toast,
 } from "@renderer/components/ui";
-import { MediaCaption, MediaCaptionActions } from "@renderer/components";
-import { t } from "i18next";
 import {
+  MediaCaption,
+  MediaCaptionActions,
   MediaCaptionAnalysis,
   MediaCaptionNote,
   MediaCaptionTranslation,
 } from "@renderer/components";
+import { t } from "i18next";
 import { cn } from "@renderer/lib/utils";
 import { ArrowLeftRightIcon } from "lucide-react";
 
@@ -79,7 +80,7 @@ export const MediaRightPanel = (props: {
   useEffect(() => {
     if (!caption) return;
 
-    let index = caption.timeline.findIndex(
+    const index = caption.timeline.findIndex(
       (w) => currentTime >= w.startTime && currentTime < w.endTime
     );
 

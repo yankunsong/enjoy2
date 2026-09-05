@@ -83,7 +83,7 @@ export const CopilotProvider = ({
   };
 
   const findOrCreateChatAgent = async () => {
-    let agent = await EnjoyApp.chatAgents.findOne({});
+    const agent = await EnjoyApp.chatAgents.findOne({});
     if (agent) {
       return agent;
     }

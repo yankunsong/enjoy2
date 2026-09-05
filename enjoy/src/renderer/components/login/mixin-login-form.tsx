@@ -99,16 +99,14 @@ export const MixinLoginForm = () => {
   };
 
   useEffect(() => {
-    let interval: NodeJS.Timeout;
-
     if (!scanning) return;
 
-    interval = setInterval(() => {
+    const interval = setInterval(() => {
       pollingOAuthState();
     }, 1500);
 
     return () => {
-      if (interval) clearInterval(interval);
+      clearInterval(interval);
     };
   }, [scanning]);
 

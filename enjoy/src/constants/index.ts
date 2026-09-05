@@ -27,7 +27,7 @@ export const REPO_URL =
 
 export const MAGIC_TOKEN_REGEX =
   /\b(Mrs|Ms|Mr|Dr|Prof|St|[a-zA-Z]{1,2}|\d{1,2})\.\b/g;
-export const END_OF_SENTENCE_REGEX = /[^\.!,\?][\.!\?]/g;
+export const END_OF_SENTENCE_REGEX = /[^.!,?][.!?]/g;
 
 export const FFMPEG_TRIM_SILENCE_OPTIONS = [
   "-af",

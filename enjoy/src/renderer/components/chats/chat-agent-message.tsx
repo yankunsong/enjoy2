@@ -99,7 +99,7 @@ export const ChatAgentMessage = (props: {
         </div>
       </div>
       <div className="flex flex-col gap-2 py-2 mb-2 rounded-lg w-full">
-        {Boolean(chatMessage.speech?.id) ? (
+        {chatMessage.speech?.id ? (
           <>
             {displayPlayer ? (
               <WavesurferPlayer
@@ -334,7 +334,7 @@ const ChatAgentMessageActions = (props: {
               className="w-4 h-4 cursor-pointer"
             />
           ))}
-        {!Boolean(chatMessage.speech) && (
+        {!chatMessage.speech && (
           <SpeechIcon
             data-tooltip-id="global-tooltip"
             data-tooltip-content={t("textToSpeech")}

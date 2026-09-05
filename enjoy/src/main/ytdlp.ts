@@ -414,7 +414,7 @@ class Ytdlp {
    */
   proxyEnv = () => {
     // keep current environment variables
-    let env = { ...process.env };
+    const env = { ...process.env };
     const proxyConfig = settings.getSync("proxy") as ProxyConfigType;
     if (proxyConfig?.enabled && proxyConfig.url) {
       env["HTTP_PROXY"] = proxyConfig.url;

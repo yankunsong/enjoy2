@@ -12,7 +12,11 @@ import {
   MediaShadowProviderContext,
 } from "@renderer/context";
 import { RecordingDetail } from "@renderer/components";
-import { cn, renderPitchContour } from "@renderer/lib/utils";
+import {
+  cn,
+  formatDuration,
+  renderPitchContour,
+} from "@renderer/lib/utils";
 import { extractFrequencies } from "@/utils";
 import WaveSurfer from "wavesurfer.js";
 import Regions from "wavesurfer.js/dist/plugins/regions";
@@ -53,7 +57,6 @@ import {
   CheckIcon,
 } from "lucide-react";
 import { t } from "i18next";
-import { formatDuration } from "@renderer/lib/utils";
 import { useHotkeys } from "react-hotkeys-hook";
 import { LiveAudioVisualizer } from "react-audio-visualize";
 import debounce from "lodash/debounce";

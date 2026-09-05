@@ -24,7 +24,14 @@ import {
 import mainWindow from "@main/window";
 import log from "@main/logger";
 import { t } from "i18next";
-import { SttEngineOptionEnum, UserSettingKeyEnum } from "@/types/enums";
+import {
+  ChatAgentTypeEnum,
+  ChatMessageRoleEnum,
+  ChatMessageStateEnum,
+  ChatTypeEnum,
+  SttEngineOptionEnum,
+  UserSettingKeyEnum,
+} from "@/types/enums";
 import { DEFAULT_GPT_CONFIG } from "@/constants";
 
 const logger = log.scope("db/models/conversation");
@@ -120,7 +127,10 @@ export class Conversation extends Model<Conversation> {
     agent = await ChatAgent.create({
       name:
         this.configuration.type === "tts" ? tts.voice || this.name : this.name,
-      type: this.configuration.type === "tts" ? "TTS" : "GPT",
+      type:
+        this.configuration.type === "tts"
+          ? ChatAgentTypeEnum.TTS
+          : ChatAgentTypeEnum.GPT,
       source,
       description: "",
       config:
@@ -139,7 +149,10 @@ export class Conversation extends Model<Conversation> {
       const chat = await Chat.create(
         {
           name: t("newChat"),
-          type: this.type === "tts" ? "TTS" : "CONVERSATION",
+          type:
+            this.type === "tts"
+              ? ChatTypeEnum.TTS
+              : ChatTypeEnum.CONVERSATION,
           config: {
             stt: SttEngineOptionEnum.ENJOY_AZURE,
           },
@@ -189,8 +202,11 @@ export class Conversation extends Model<Conversation> {
           {
             chatId: chat.id,
             content: message.content,
-            role: message.role === "user" ? "USER" : "AGENT",
-            state: "completed",
+            role:
+              message.role === "user"
+                ? ChatMessageRoleEnum.USER
+                : ChatMessageRoleEnum.AGENT,
+            state: ChatMessageStateEnum.COMPLETED,
             memberId: message.role === "assistant" ? chatMember.id : null,
             agentId: message.role === "assistant" ? agent.id : null,
             createdAt: message.createdAt,

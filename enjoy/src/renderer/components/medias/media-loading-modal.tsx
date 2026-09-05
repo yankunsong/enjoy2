@@ -22,7 +22,7 @@ export const MediaLoadingModal = () => {
   const { decoded, transcription } = useContext(MediaShadowProviderContext);
 
   return (
-    <AlertDialog open={!decoded || !Boolean(transcription?.result?.timeline)}>
+    <AlertDialog open={!decoded || !transcription?.result?.timeline}>
       <AlertDialogContent className="max-h-[70%] overflow-y-auto">
         <AlertDialogHeader>
           <AlertDialogTitle>{t("preparingAudio")}</AlertDialogTitle>

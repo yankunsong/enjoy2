@@ -28,7 +28,7 @@ export const YoutubeVideosSegment = (props: { channel: string }) => {
   const [downloadSpeed, setDownloadSpeed] = useState(null);
 
   const addToLibrary = () => {
-    let url = `https://www.youtube.com/watch?v=${selectedVideo?.videoId}`;
+    const url = `https://www.youtube.com/watch?v=${selectedVideo?.videoId}`;
     setSubmitting(true);
     setProgress(0);
 

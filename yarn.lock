@@ -14645,6 +14645,7 @@ __metadata:
     fluent-ffmpeg: "npm:^2.1.3"
     foliate-js: "https://github.com/johnfactotum/foliate-js.git"
     fs-extra: "npm:^11.3.0"
+    globals: "npm:^16"
     html-to-text: "npm:^9.0.5"
     https-proxy-agent: "npm:^7.0.6"
     i18next: "npm:^24.2.3"
@@ -16894,6 +16895,13 @@ __metadata:
   version: 15.15.0
   resolution: "globals@npm:15.15.0"
   checksum: 10c0/f9ae80996392ca71316495a39bec88ac43ae3525a438b5626cd9d5ce9d5500d0a98a266409605f8cd7241c7acf57c354a48111ea02a767ba4f374b806d6861fe
+  languageName: node
+  linkType: hard
+
+"globals@npm:^16":
+  version: 16.5.0
+  resolution: "globals@npm:16.5.0"
+  checksum: 10c0/615241dae7851c8012f5aa0223005b1ed6607713d6813de0741768bd4ddc39353117648f1a7086b4b0fa45eae733f1c0a0fe369aa4e543bb63f8de8990178ea9
   languageName: node
   linkType: hard
 

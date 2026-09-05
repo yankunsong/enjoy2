@@ -3,9 +3,8 @@ import { AppSettingsProviderContext } from "@renderer/context";
 import { Button, toast, TabsContent } from "@renderer/components/ui";
 import { ConversationShortcuts } from "@renderer/components";
 import { t } from "i18next";
-import { BotIcon } from "lucide-react";
+import { BotIcon, LoaderIcon } from "lucide-react";
 import { useAiCommand } from "@renderer/hooks";
-import { LoaderIcon } from "lucide-react";
 import { md5 } from "js-md5";
 import Markdown from "react-markdown";
 
@@ -55,7 +54,9 @@ export function MediaCaptionAnalysis(props: { text: string }) {
                   new URL(props.href ?? "");
                   props.target = "_blank";
                   props.rel = "noopener noreferrer";
-                } catch (e) {}
+                } catch (e) {
+                  // Not an absolute URL, so it is not a link to open outside.
+                }
 
                 return <a {...props}>{children}</a>;
               },

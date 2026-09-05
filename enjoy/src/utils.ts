@@ -64,11 +64,11 @@ export const convertWordIpaToNormal = (
   const consonants = Object.keys(IPA_CONSONANTS)
     .map((key) => IPA_CONSONANTS[key])
     .reduce((acc, val) => acc.concat(val), []);
-  const consonantsRegex = new RegExp(`^(\ˈ|ˌ)?` + consonants.join("|"));
+  const consonantsRegex = new RegExp(`^(ˈ|ˌ)?` + consonants.join("|"));
   const vowels = Object.keys(IPA_VOWELS)
     .map((key) => IPA_VOWELS[key])
     .reduce((acc, val) => acc.concat(val), []);
-  const vowelsRegex = new RegExp(`^(\ˈ|ˌ)?` + vowels.join("|"));
+  const vowelsRegex = new RegExp(`^(ˈ|ˌ)?` + vowels.join("|"));
 
   const converted: string[] = [];
 
@@ -80,7 +80,7 @@ export const convertWordIpaToNormal = (
     converted.push(convertIpaToNormal(ipa, { mappings, marked: false }));
 
     const isVowel = vowelsRegex.test(ipa);
-    const mark = ipa.match(/(\ˈ|ˌ)/);
+    const mark = ipa.match(/(ˈ|ˌ)/);
 
     let j = i - 1;
     for (; j > 0 && j > i - 2; j--) {
@@ -117,7 +117,7 @@ export const convertIpaToNormal = (
 ): string => {
   const { mappings = IPA_MAPPINGS, marked = false } = options || {};
 
-  const mark = ipa.match(/(\ˈ|ˌ)/);
+  const mark = ipa.match(/(ˈ|ˌ)/);
   const cleanIpa = ipa.replace(mark ? mark[0] : "", "");
 
   const converted = mappings[cleanIpa] || cleanIpa;

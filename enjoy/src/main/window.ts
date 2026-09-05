@@ -776,6 +776,7 @@ ${log}
     // Remove ANSI color codes
     const output = chunk
       .toString()
+      // eslint-disable-next-line no-control-regex -- ESC is the code being stripped
       .replace(/\x1B\[([0-9]{1,3}(;[0-9]{1,2};?)?)?[mGK]/g, "");
     mainWindow.webContents.send("app-on-cmd-output", output);
 
@@ -786,6 +787,7 @@ ${log}
     // Remove ANSI color codes
     const output = chunk
       .toString()
+      // eslint-disable-next-line no-control-regex -- ESC is the code being stripped
       .replace(/\x1B\[([0-9]{1,3}(;[0-9]{1,2};?)?)?[mGK]/g, "");
     mainWindow.webContents.send("app-on-cmd-output", output);
 

@@ -34,6 +34,9 @@ declare global {
     __ENJOY_APP__: EnjoyAppType;
   }
 
+  // Augmenting the global JSX namespace is the only way to declare a custom
+  // element, so this one has to be a namespace.
+  // eslint-disable-next-line @typescript-eslint/no-namespace
   namespace JSX {
     interface IntrinsicElements {
       vocabulary: any;

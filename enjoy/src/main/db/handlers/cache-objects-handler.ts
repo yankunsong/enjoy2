@@ -64,13 +64,17 @@ class CacheObjectsHandler {
       });
   }
 
+  // Both are real callers: `use-transcribe` hands over a Blob's ArrayBuffer,
+  // `document-add-button` a Buffer of parsed HTML. Electron's structured clone
+  // carries either, and so does the browser bridge, so the parameter says both
+  // rather than naming one and leaving the other to a cast.
   private async writeFile(
     _event: IpcMainEvent,
     filename: string,
-    data: ArrayBuffer
+    data: ArrayBuffer | Buffer
   ) {
     const output = path.join(settings.cachePath(), filename);
-    fs.writeFileSync(output, Buffer.from(data));
+    fs.writeFileSync(output, Buffer.isBuffer(data) ? data : Buffer.from(data));
 
     return `enjoy://library/cache/${filename}`;
   }

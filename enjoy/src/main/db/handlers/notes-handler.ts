@@ -127,12 +127,13 @@ class NotesHandler {
     const { targetId, targetType, content, parameters } = params;
 
     switch (targetType) {
-      case "Segment":
+      case "Segment": {
         const segment = await Segment.findByPk(targetId);
         if (!segment) {
           throw new Error("Segment not found");
         }
         break;
+      }
       default:
         throw new Error("Invalid target");
     }

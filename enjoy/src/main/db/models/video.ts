@@ -361,7 +361,7 @@ export class Video extends Model<Video> {
         md5,
       },
     });
-    if (!!existing) {
+    if (existing) {
       logger.warn("Video already exists:", existing.id, existing.name);
       existing.changed("updatedAt", true);
       existing.update({ updatedAt: new Date() });

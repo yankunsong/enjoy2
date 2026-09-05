@@ -4,18 +4,32 @@ on:
   push:
     branches:
       - main
+    # Kept in step with the pull_request list below. GitHub Actions does not
+    # resolve YAML anchors, so the two are written out rather than shared.
     paths:
       - "enjoy/**"
       - "yarn.lock"
+      # The root scripts the gates and suites are called through, and this
+      # file. A change to either decides whether this job runs at all, so a
+      # change to either has to be able to run it.
+      - "package.json"
+      - ".github/workflows/test-enjoy-app.yml"
   pull_request:
     branches:
       - main
     paths:
       - "enjoy/**"
+      - "yarn.lock"
+      - "package.json"
+      - ".github/workflows/test-enjoy-app.yml"
 jobs:
   # The `node` project: every suite that needs nothing built. Why the split
   # falls where it does is in enjoy/playwright.config.ts; what it buys is this
   # job — one cheap runner, no packaging in front of it, an answer in seconds.
+  #
+  # The lint and typecheck gates ride along here rather than in a job of their
+  # own: they need the same install and no build, and a second runner to say
+  # the same thing costs more than it tells us.
   node-test:
     timeout-minutes: 15
     runs-on: ubuntu-latest
@@ -35,6 +49,12 @@ jobs:
 
       - name: Install dependencies
         run: yarn install
+
+      - name: Lint
+        run: yarn enjoy:lint
+
+      - name: Typecheck
+        run: yarn enjoy:typecheck
 
       - name: Run the suites that need no build
         run: yarn enjoy:test:node

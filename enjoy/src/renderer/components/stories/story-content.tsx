@@ -3,6 +3,15 @@ import nlp from "compromise";
 import paragraphs from "compromise-paragraphs";
 nlp.plugin(paragraphs);
 
+/**
+ * What `compromise-paragraphs` adds to a document. The plugin registers at
+ * runtime and ships no types of its own, so compromise's own type parameter
+ * carries it.
+ */
+type ParagraphsPlugin = {
+  paragraphs: () => { json: () => { terms: any[]; text: string }[][] };
+};
+
 export const StoryContent = (props: { content: string }) => {
   const { content } = props;
   if (!content) return null;
@@ -10,7 +19,7 @@ export const StoryContent = (props: { content: string }) => {
   const [paragraphs, setParagraphs] = useState<
     { terms: any[]; text: string }[][]
   >([]);
-  const doc = nlp(content);
+  const doc = nlp<ParagraphsPlugin>(content);
   doc.cache();
 
   useEffect(() => {

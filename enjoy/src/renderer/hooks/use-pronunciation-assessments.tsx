@@ -158,7 +158,7 @@ export const usePronunciationAssessments = () => {
         reco.close();
 
         switch (result.reason) {
-          case sdk.ResultReason.RecognizedSpeech:
+          case sdk.ResultReason.RecognizedSpeech: {
             const pronunciationResult =
               sdk.PronunciationAssessmentResult.fromResult(result);
             console.debug(
@@ -167,10 +167,11 @@ export const usePronunciationAssessments = () => {
             );
             resolve(pronunciationResult);
             break;
+          }
           case sdk.ResultReason.NoMatch:
             reject(new Error("No speech could be recognized."));
             break;
-          case sdk.ResultReason.Canceled:
+          case sdk.ResultReason.Canceled: {
             const cancellationDetails =
               sdk.CancellationDetails.fromResult(result);
             console.debug(
@@ -181,6 +182,7 @@ export const usePronunciationAssessments = () => {
             );
             reject(new Error(cancellationDetails.errorDetails));
             break;
+          }
           default:
             reject(result);
         }

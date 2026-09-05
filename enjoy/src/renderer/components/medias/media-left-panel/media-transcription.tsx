@@ -29,8 +29,8 @@ import {
   MediaTranscriptionGenerateButton,
   MediaTranscriptionPrint,
   TranscriptionEditButton,
+  Sentence,
 } from "@renderer/components";
-import { Sentence } from "@renderer/components";
 import { useCopyToClipboard } from "@uidotdev/usehooks";
 
 export const MediaTranscription = (props: { display?: boolean }) => {

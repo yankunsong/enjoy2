@@ -243,7 +243,9 @@ export const MarkdownWrapper = memo(
             new URL(props.href ?? "");
             props.target = "_blank";
             props.rel = "noopener noreferrer";
-          } catch (e) {}
+          } catch (e) {
+            // Not an absolute URL, so it is not a link to open outside.
+          }
 
           return (
             <a {...props} onClick={handleLinkClick}>

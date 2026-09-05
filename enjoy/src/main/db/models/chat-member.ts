@@ -101,7 +101,7 @@ export class ChatMember extends Model<ChatMember> {
   /**
    * Messages go one at a time, and awaited, for the reason they do everywhere
    * else: a bulk destroy fires only the bulk hooks, so
-   * `ChatMessage.destroyRecordings` never runs, and the Speech under each
+   * `ChatMessage.destroySpeechesAndRecordings` never runs, and the Speech under each
    * message — with the mp3 it names — stays in the Library with nothing
    * pointing at it. Awaited so that a member is not answered as removed while
    * the messages it spoke are still on their way out.

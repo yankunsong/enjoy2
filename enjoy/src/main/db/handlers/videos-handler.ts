@@ -168,13 +168,24 @@ class VideosHandler {
     return pathToEnjoyUrl(output);
   }
 
+  /**
+   * A Video whose file is no longer under it is a row the Library cannot play,
+   * so the sweep takes it — and, through its hooks, the Recordings made against
+   * it and their files.
+   *
+   * Awaited, so the sweep is not answered as done while what it destroyed is
+   * still on its way out; a Video that will not go is logged rather than
+   * thrown, since one stuck row is no reason to abandon the rest.
+   */
   private async cleanUp() {
     const videos = await Video.findAll();
 
     for (const video of videos) {
-      if (!video.src) {
-        video.destroy();
-      }
+      if (video.src) continue;
+
+      await video.destroy().catch((err: Error) => {
+        logger.error("failed to destroy video:", err.message);
+      });
     }
   }
 

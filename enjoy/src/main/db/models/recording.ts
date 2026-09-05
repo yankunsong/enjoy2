@@ -31,7 +31,7 @@ import storage from "@main/storage";
 import { Client } from "@/api";
 import echogarden from "@main/echogarden";
 import { t } from "i18next";
-import { Attributes, Op, Transaction } from "sequelize";
+import { Attributes, Op, Transaction, WhereOptions } from "sequelize";
 import { v5 as uuidv5 } from "uuid";
 import FfmpegWrapper from "@main/ffmpeg";
 import { MIME_TYPES } from "@/constants";
@@ -269,34 +269,84 @@ export class Recording extends Model<Recording> {
     this.notify(recording, "destroy");
   }
 
+  /**
+   * The Media may be gone already: deleting one takes its Recordings with it,
+   * and by the time this runs there is no row left to hold a count. Nothing to
+   * decrement is not a failure — it is the ordinary shape of that path.
+   */
   @AfterDestroy
   static decreaseResourceCache(recording: Recording) {
     if (recording.targetType === "Audio") {
-      Audio.findByPk(recording.targetId).then((audio) => {
-        audio.decrement("recordingsCount");
-        audio.decrement("recordingsDuration", {
-          by: recording.duration,
+      Audio.findByPk(recording.targetId)
+        .then((audio) => {
+          if (!audio) return;
+
+          audio.decrement("recordingsCount");
+          audio.decrement("recordingsDuration", {
+            by: recording.duration,
+          });
+        })
+        .catch((err: Error) => {
+          logger.error("failed to decrease audio cache:", err.message);
         });
-      });
     } else if (recording.targetType === "Video") {
-      Video.findByPk(recording.targetId).then((video) => {
-        video.decrement("recordingsCount");
-        video.decrement("recordingsDuration", {
-          by: recording.duration,
+      Video.findByPk(recording.targetId)
+        .then((video) => {
+          if (!video) return;
+
+          video.decrement("recordingsCount");
+          video.decrement("recordingsDuration", {
+            by: recording.duration,
+          });
+        })
+        .catch((err: Error) => {
+          logger.error("failed to decrease video cache:", err.message);
         });
-      });
     }
   }
 
   @AfterDestroy
   static async cleanupFile(recording: Recording) {
-    fs.remove(recording.filePath);
+    // `filePath` answers null for a file that is not there any more, and
+    // `fs.remove` will not take a null path.
+    if (recording.filePath) {
+      await fs.remove(recording.filePath);
+    }
+
     const webApi = new Client({
       baseUrl: settings.apiUrl(),
       accessToken: (await UserSetting.accessToken()) as string,
       logger: log.scope("recording/cleanupFile"),
     });
-    webApi.deleteRecording(recording.id);
+
+    webApi.deleteRecording(recording.id).catch((err) => {
+      logger.error("deleteRecording failed:", err.message);
+    });
+  }
+
+  /**
+   * Destroy every Recording matching `where`, one at a time and awaited. Every
+   * path that owns Recordings owns a set of them, so this is what those paths
+   * call instead of `Recording.destroy`.
+   *
+   * One at a time because a bulk destroy fires only the bulk hooks: with it,
+   * `cleanupFile` never runs, and the audio the learner recorded stays in the
+   * Library with nothing left that can reach it. Awaited so that whatever owned
+   * them — a Media, a chat message — is not answered as deleted while its
+   * Recordings are still on their way out.
+   *
+   * A Recording that will not go is logged rather than thrown, as a Speech
+   * already is: a file left behind is not a reason to refuse to delete the
+   * thing that owned it.
+   */
+  static async destroyEach(where: WhereOptions<Attributes<Recording>>) {
+    const recordings = await Recording.findAll({ where });
+
+    for (const recording of recordings) {
+      await recording.destroy().catch((err: Error) => {
+        logger.error("failed to destroy recording:", err.message);
+      });
+    }
   }
 
   static async createFromBlob(

@@ -308,11 +308,9 @@ export class Video extends Model<Video> {
     if (video.filePath) {
       fs.remove(video.filePath);
     }
-    Recording.destroy({
-      where: {
-        targetId: video.id,
-        targetType: "Video",
-      },
+    await Recording.destroyEach({
+      targetId: video.id,
+      targetType: "Video",
     });
 
     const webApi = new Client({

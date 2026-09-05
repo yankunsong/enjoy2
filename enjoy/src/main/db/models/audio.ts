@@ -286,11 +286,9 @@ export class Audio extends Model<Audio> {
     if (audio.filePath) {
       fs.remove(audio.filePath);
     }
-    Recording.destroy({
-      where: {
-        targetId: audio.id,
-        targetType: "Audio",
-      },
+    await Recording.destroyEach({
+      targetId: audio.id,
+      targetType: "Audio",
     });
     Transcription.destroy({
       where: {

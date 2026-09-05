@@ -171,13 +171,24 @@ class AudiosHandler {
     return pathToEnjoyUrl(output);
   }
 
+  /**
+   * A Audio whose file is no longer under it is a row the Library cannot play,
+   * so the sweep takes it — and, through its hooks, the Recordings made against
+   * it and their files.
+   *
+   * Awaited, so the sweep is not answered as done while what it destroyed is
+   * still on its way out; a Audio that will not go is logged rather than
+   * thrown, since one stuck row is no reason to abandon the rest.
+   */
   private async cleanUp() {
     const audios = await Audio.findAll();
 
     for (const audio of audios) {
-      if (!audio.src) {
-        audio.destroy();
-      }
+      if (audio.src) continue;
+
+      await audio.destroy().catch((err: Error) => {
+        logger.error("failed to destroy audio:", err.message);
+      });
     }
   }
 

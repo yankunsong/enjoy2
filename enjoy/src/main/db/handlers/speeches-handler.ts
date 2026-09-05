@@ -101,7 +101,8 @@ class SpeechesHandler {
    * every regeneration, so that is a file left behind each time.
    *
    * `Diary.destroySpeeches`, `Message.destroySpeeches` and
-   * `ChatMessage.destroyRecordings` destroy one at a time for the same reason.
+   * `ChatMessage.destroySpeechesAndRecordings` destroy one at a time for the
+   * same reason.
    */
   private async delete(_event: IpcMainEvent, id: string) {
     const speech = await Speech.findByPk(id);

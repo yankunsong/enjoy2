@@ -108,6 +108,29 @@ const SAMPLE_DIARY_RECORDING = path.join(
   "diary-recording.mp3"
 );
 
+// The Recording a learner made against a chat message, needing bytes of its own
+// for the same reason as the one above.
+const SAMPLE_CHAT_RECORDING = path.join(
+  process.cwd(),
+  "test-results",
+  "chat-recording.mp3"
+);
+
+// The Media deleted to check the same rule on the Video path, and the Recording
+// made against it. Both need content of their own, for the same two reasons:
+// importing a Media deduplicates by content, and so does recording.
+const SAMPLE_DOOMED_VIDEO = path.join(
+  process.cwd(),
+  "test-results",
+  "doomed-video.mp4"
+);
+
+const SAMPLE_VIDEO_RECORDING = path.join(
+  process.cwd(),
+  "test-results",
+  "video-recording.mp3"
+);
+
 // A long stereo Media, the shape the upload limit is actually hit by. Fifteen
 // minutes of it as an uncompressed 16 kHz stereo WAV is far past OpenAI's
 // 25 MB; the fixture itself stays small because it ships compressed.
@@ -296,6 +319,9 @@ test.beforeAll(async () => {
   buildAudio(SAMPLE_CHAT_SPEECH_AUDIO, 7);
   fs.outputFileSync(SAMPLE_SHARED_DOCUMENT, `${SHARED_TEXT}\n`);
   buildAudio(SAMPLE_DIARY_RECORDING, 2);
+  buildAudio(SAMPLE_CHAT_RECORDING, 8);
+  buildVideo(SAMPLE_DOOMED_VIDEO, 3);
+  buildAudio(SAMPLE_VIDEO_RECORDING, 9);
   buildSampleLongStereo();
   ytDlpControl({});
   await startHostedEnjoy();
@@ -1744,6 +1770,69 @@ test("leaves the Recording made against it, file and all", async () => {
   expect(fs.existsSync(await recordingFile(kept.filename))).toBe(true);
 });
 
+/**
+ * Deleting the Media those Recordings were made against, which is the other
+ * half of the same rule. A Recording is practice against one Media: with the
+ * Media gone there is no sentence left to play it back against and nothing that
+ * can reach it, so it goes too — and, like every other derivative, its file
+ * goes with it rather than sitting in the Library unnamed.
+ *
+ * This runs after the Diary above has been deleted, so what it deletes is a
+ * Media that has already outlived the text it was spoken from — the state a
+ * learner who tidies up their writing and then their Library actually reaches.
+ */
+test("takes the Recordings made against a Media, and their files, with it", async () => {
+  const file = await recordingFile(survivingRecording.filename);
+  expect(fs.existsSync(file)).toBe(true);
+
+  const destroyed = await ipc("audios-destroy", survivingAudio.id);
+  expect(destroyed.status).toBe(200);
+
+  const { body } = await ipc("recordings-find-all", {
+    where: { targetId: survivingAudio.id, targetType: "Audio" },
+  });
+  expect(body.result).toHaveLength(0);
+
+  // Read once rather than polled: the Recordings are destroyed as part of the
+  // Media's own departure, so the file has to be gone by the time the delete is
+  // answered, not shortly afterwards.
+  expect(fs.existsSync(file)).toBe(false);
+});
+
+/**
+ * The same rule on the Video path, which is a second copy of the same hook
+ * rather than a call into the first — so a Media being a Video is exactly where
+ * it would go on being got wrong unnoticed.
+ */
+test("takes them with a Video too, which deletes down a hook of its own", async () => {
+  const imported = await ipc("videos-create", SAMPLE_DOOMED_VIDEO, {
+    compressing: false,
+  });
+  expect(imported.status).toBe(200);
+  const video = imported.body.result;
+
+  const recorded = await ipc("recordings-create", {
+    targetId: video.id,
+    targetType: "Video",
+    referenceId: 0,
+    referenceText: "Whatever the test pattern is saying.",
+    blob: blobOf(SAMPLE_VIDEO_RECORDING, "audio/mpeg"),
+  });
+  expect(recorded.status).toBe(200);
+
+  const file = await recordingFile(recorded.body.result.filename);
+  expect(fs.existsSync(file)).toBe(true);
+
+  const destroyed = await ipc("videos-destroy", video.id);
+  expect(destroyed.status).toBe(200);
+
+  const { body } = await ipc("recordings-find-all", {
+    where: { targetId: video.id, targetType: "Video" },
+  });
+  expect(body.result).toHaveLength(0);
+  expect(fs.existsSync(file)).toBe(false);
+});
+
 test("deletes a Diary that was never spoken, rather than failing", async () => {
   const written = (await createDiary({ content: "Nothing said out loud." }))
     .body.result;
@@ -1768,6 +1857,7 @@ const CHAT_SPOKEN_TEXT = "Every boat came back before the weather turned.";
 let leavingMemberId: string;
 let spokenChatMessageId: string;
 let chatSpeech: any;
+let chatRecording: any;
 
 test("stands a chat up with two agents, and a spoken message from one", async () => {
   const agents = [];
@@ -1828,8 +1918,21 @@ test("stands a chat up with two agents, and a spoken message from one", async ()
   expect(spoken.status).toBe(200);
   chatSpeech = spoken.body.result;
 
+  // A learner shadowing what the agent said, which is the other file hanging
+  // off this message.
+  const recorded = await ipc("recordings-create", {
+    targetId: spokenChatMessageId,
+    targetType: "ChatMessage",
+    referenceId: 0,
+    referenceText: CHAT_SPOKEN_TEXT,
+    blob: blobOf(SAMPLE_CHAT_RECORDING, "audio/mpeg"),
+  });
+  expect(recorded.status).toBe(200);
+  chatRecording = recorded.body.result;
+
   // What the removal below has to take away, confirmed present first.
   expect(fs.existsSync(await speechFile(chatSpeech.filename))).toBe(true);
+  expect(fs.existsSync(await recordingFile(chatRecording.filename))).toBe(true);
 });
 
 test("takes the leaving member's messages, their Speeches and their files", async () => {
@@ -1857,6 +1960,16 @@ test("takes the leaving member's messages, their Speeches and their files", asyn
   // The mp3 too: nothing speaks those bytes any more, and a Library filling
   // with audio for messages nobody can read is what the hook exists to prevent.
   expect(fs.existsSync(await speechFile(chatSpeech.filename))).toBe(false);
+
+  // And the learner's own recording of that message, which the same hook
+  // destroyed in bulk — taking the record and leaving the audio behind.
+  const recordings = await ipc("recordings-find-all", {
+    where: { targetId: spokenChatMessageId, targetType: "ChatMessage" },
+  });
+  expect(recordings.body.result).toHaveLength(0);
+  expect(fs.existsSync(await recordingFile(chatRecording.filename))).toBe(
+    false
+  );
 });
 
 test("reached Hosted Enjoy at no point along the way", async () => {

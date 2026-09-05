@@ -213,13 +213,15 @@ export class ChatMessage extends Model<ChatMessage> {
   }
 
   /**
-   * Speeches go one at a time, and awaited, for the reason they do everywhere
-   * else: a bulk destroy fires only the bulk hooks, so `Speech.cleanupFile`
-   * never runs and the mp3 stays in the Library with nothing pointing at it.
+   * What hangs off a message: the Speech that says it, and the Recordings of
+   * somebody shadowing it. Both go one at a time, and awaited, for the reason
+   * they do everywhere else: a bulk destroy fires only the bulk hooks, so the
+   * file-removing hook never runs and the file stays in the Library with
+   * nothing pointing at it.
    */
   @AfterDestroy
-  static async destroyRecordings(chatMessage: ChatMessage) {
-    Recording.destroy({ where: { targetId: chatMessage.id } });
+  static async destroySpeechesAndRecordings(chatMessage: ChatMessage) {
+    await Recording.destroyEach({ targetId: chatMessage.id });
 
     const speeches = await Speech.findAll({
       where: { sourceId: chatMessage.id },

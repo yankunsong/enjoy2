@@ -212,9 +212,23 @@ export class ChatMessage extends Model<ChatMessage> {
     });
   }
 
+  /**
+   * Speeches go one at a time, and awaited, for the reason they do everywhere
+   * else: a bulk destroy fires only the bulk hooks, so `Speech.cleanupFile`
+   * never runs and the mp3 stays in the Library with nothing pointing at it.
+   */
   @AfterDestroy
   static async destroyRecordings(chatMessage: ChatMessage) {
     Recording.destroy({ where: { targetId: chatMessage.id } });
-    Speech.destroy({ where: { sourceId: chatMessage.id } });
+
+    const speeches = await Speech.findAll({
+      where: { sourceId: chatMessage.id },
+    });
+
+    for (const speech of speeches) {
+      await speech.destroy().catch((err: Error) => {
+        logger.error("failed to destroy speech:", err.message);
+      });
+    }
   }
 }

@@ -91,8 +91,23 @@ class SpeechesHandler {
       });
   }
 
-  private async delete(event: IpcMainEvent, id: string) {
-    await Speech.destroy({ where: { id } });
+  /**
+   * Destroys the instance rather than the rows matching it, deliberately.
+   *
+   * A bulk destroy fires only the bulk hooks, so `Speech.cleanupFile` — which
+   * takes the mp3 with the record, unless another source still speaks it —
+   * never runs on that path, and the file stays in the Library with nothing
+   * pointing at it. The ebook reader refreshes a paragraph through here on
+   * every regeneration, so that is a file left behind each time.
+   *
+   * `Diary.destroySpeeches`, `Message.destroySpeeches` and
+   * `ChatMessage.destroyRecordings` destroy one at a time for the same reason.
+   */
+  private async delete(_event: IpcMainEvent, id: string) {
+    const speech = await Speech.findByPk(id);
+    if (!speech) return;
+
+    await speech.destroy();
   }
 
   register() {

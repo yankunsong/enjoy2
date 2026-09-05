@@ -1214,6 +1214,19 @@ const createSpeech = (diaryId: string, text: string, audio = SAMPLE_AUDIO) =>
 const findSpeech = (diaryId: string, text: string) =>
   ipc("speeches-find-one", { sourceId: diaryId, sourceType: "Diary", text });
 
+/**
+ * A Document's Speech, asked for the way the ebook reader asks: by where in the
+ * page it is rather than by the words, since a Document is spoken a paragraph
+ * at a time.
+ */
+const findDocumentSpeech = (documentId: string, section = 0, segment = 0) =>
+  ipc("speeches-find-one", {
+    sourceId: documentId,
+    sourceType: "Document",
+    section,
+    segment,
+  });
+
 /** Where the Library keeps what a user owns, which is under their own directory. */
 const userLibraryFile = async (
   kind: "speeches" | "recordings" | "audios",
@@ -1383,14 +1396,7 @@ test("keeps a Speech for a Document that says it too, not only for Diaries", asy
   );
   expect(created.status).toBe(200);
 
-  // Asked the way the ebook reader asks, which is by where in the Document it
-  // is rather than by the words.
-  const { body } = await ipc("speeches-find-one", {
-    sourceId: documentId,
-    sourceType: "Document",
-    section: 0,
-    segment: 0,
-  });
+  const { body } = await findDocumentSpeech(documentId);
   expect(body.result?.sourceId).toBe(documentId);
   expect(body.result.id).not.toBe(sharedSpeech.id);
   expect(body.result.filename).toBe(sharedSpeech.filename);
@@ -1411,12 +1417,7 @@ test("leaves the other Diary its Speech, and the audio under it, on deletion", a
 
   // And the Document's, which the same file sits under: tidying up a Diary has
   // no business emptying a page of a book.
-  const spokenPage = await ipc("speeches-find-one", {
-    sourceId: documentId,
-    sourceType: "Document",
-    section: 0,
-    segment: 0,
-  });
+  const spokenPage = await findDocumentSpeech(documentId);
   expect(spokenPage.body.result?.filename).toBe(kept.filename);
 
   // Both halves, because the record surviving with nothing under it is a player
@@ -1427,6 +1428,43 @@ test("leaves the other Diary its Speech, and the audio under it, on deletion", a
     { headers: { Range: "bytes=0-99" } }
   );
   expect(played.status).toBe(206);
+});
+
+/**
+ * Deleting a Speech on its own, which is what refreshing a Document paragraph
+ * does: the reader throws away what the page was speaking before asking for it
+ * again. The same rule has to hold on that path as on a deleted Diary's — the
+ * file goes when nothing speaks it any more, and stays while something does.
+ */
+
+test("leaves the file alone when another source still speaks it", async () => {
+  const spokenPage = (await findDocumentSpeech(documentId)).body.result;
+
+  expect((await ipc("speeches-delete", spokenPage.id)).status).toBe(200);
+
+  // The record goes, and only that record: the Diary saying the same sentence
+  // is still spoken, out of the file the page was sharing with it.
+  expect((await findDocumentSpeech(documentId)).body.result).toBeNull();
+
+  const kept = (await findSpeech(sharingDiaryId, SHARED_TEXT)).body.result;
+  expect(kept?.filename).toBe(spokenPage.filename);
+  expect(fs.existsSync(await speechFile(spokenPage.filename))).toBe(true);
+});
+
+test("takes the file with the last Speech that names it", async () => {
+  // Last because the Diary that also spoke it has been deleted, and the page
+  // that shared its file was refreshed by the test above.
+  const last = (await findSpeech(sharingDiaryId, SHARED_TEXT)).body.result;
+  const file = await speechFile(last.filename);
+  expect(fs.existsSync(file)).toBe(true);
+
+  expect((await ipc("speeches-delete", last.id)).status).toBe(200);
+
+  // Nothing speaks those bytes now, so nothing should be holding them: this is
+  // the path a refreshed paragraph took, once per refresh, leaving the Library
+  // filling with audio for text nobody says any more.
+  expect((await findSpeech(sharingDiaryId, SHARED_TEXT)).body.result).toBeNull();
+  expect(fs.existsSync(file)).toBe(false);
 });
 
 /**

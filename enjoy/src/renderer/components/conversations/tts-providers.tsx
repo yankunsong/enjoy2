@@ -744,7 +744,19 @@ export const TTS_PROVIDERS: { [key: string]: any } = {
   elevenlabs: {
     name: "ElevenLabs",
     description: t("youNeedToSetupApiKeyBeforeUsingElevenLabs"),
-    models: ["eleven_multilingual_v2", "eleven_turbo_v2_5", "eleven_flash_v2_5"],
+    // Newest first, since that is the order somebody scanning the list reads
+    // it in. `eleven_v3` is ElevenLabs' current flagship — the expressive one,
+    // 70+ languages — and it speaks through the same
+    // `POST /v1/text-to-speech/{voice_id}` as the rest, so it costs nothing
+    // here but its id. It is slower than the others and caps a request at
+    // 5,000 characters against v2's 10,000, which is why it does not become
+    // the default a new install gets.
+    models: [
+      "eleven_v3",
+      "eleven_multilingual_v2",
+      "eleven_turbo_v2_5",
+      "eleven_flash_v2_5",
+    ],
     // Deliberately empty. Unlike every other provider here, an ElevenLabs voice
     // is identified by an account-specific id rather than a name everyone
     // shares, and the set of them depends on the account — the built-in ones,

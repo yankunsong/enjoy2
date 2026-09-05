@@ -7,3 +7,4 @@ export * from "./universal-player";
 export * from "./wavesurfer-player";
 export * from "./tts-form";
 export * from "./gpt-form";
+export * from "./voice-preview-button";

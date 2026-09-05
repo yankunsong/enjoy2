@@ -11,6 +11,12 @@ const API_URL = "https://api.elevenlabs.io/v1";
 export type ElevenLabsVoice = {
   label: string;
   value: string;
+  /**
+   * A hosted sample of this voice, when ElevenLabs has one — the same clip its
+   * own voice library plays. Free to fetch and free to play: it is a file on a
+   * CDN, not a synthesis, so previewing a voice costs no credits.
+   */
+  previewUrl?: string;
 };
 
 /**
@@ -44,6 +50,7 @@ export const fetchElevenLabsVoices = async (
         ? `${voice.name} (${voice.category})`
         : voice.name,
     value: voice.voice_id,
+    previewUrl: voice.preview_url,
   }));
 };
 

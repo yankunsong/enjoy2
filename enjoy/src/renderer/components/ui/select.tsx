@@ -118,8 +118,19 @@ SelectLabel.displayName = SelectPrimitive.Label.displayName;
 
 const SelectItem = React.forwardRef<
   React.ElementRef<typeof SelectPrimitive.Item>,
-  React.ComponentPropsWithoutRef<typeof SelectPrimitive.Item>
->(({ className, children, ...props }, ref) => (
+  React.ComponentPropsWithoutRef<typeof SelectPrimitive.Item> & {
+    /**
+     * Something to sit beside the label — a preview button, a badge — that
+     * belongs to this row and not to the value.
+     *
+     * It cannot go in `children`: Radix clones the item's text into the closed
+     * trigger, so anything put there follows the choice out of the list and
+     * turns up in the box. An accessory is rendered outside `ItemText`, which
+     * is what keeps it in the row it describes.
+     */
+    accessory?: React.ReactNode;
+  }
+>(({ className, children, accessory, ...props }, ref) => (
   <SelectPrimitive.Item
     ref={ref}
     className={cn(
@@ -133,6 +144,7 @@ const SelectItem = React.forwardRef<
         <CheckIcon className="h-4 w-4" />
       </SelectPrimitive.ItemIndicator>
     </span>
+    {accessory}
     <SelectPrimitive.ItemText>{children}</SelectPrimitive.ItemText>
   </SelectPrimitive.Item>
 ));

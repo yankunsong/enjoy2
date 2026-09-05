@@ -532,6 +532,8 @@
   "selectTtsEngine": "Select TTS engine",
   "selectTtsModel": "Select TTS model",
   "selectTtsVoice": "Select TTS voice",
+  "previewVoice": "Preview voice",
+  "failedToPreviewVoice": "Failed to preview this voice",
   "selectTtsLanguage": "Select TTS Language",
   "pleaseSelectTtsVoice": "Please select TTS voice",
   "youNeedToSetupApiKeyBeforeUsingOpenAI": "You need to setup API key before using OpenAI",

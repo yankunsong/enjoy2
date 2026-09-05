@@ -1,4 +1,5 @@
 import { t } from "i18next";
+import type { ElevenLabsVoice } from "@renderer/lib/elevenlabs";
 
 export const TTS_PROVIDERS: { [key: string]: any } = {
   enjoyai: {
@@ -752,7 +753,7 @@ export const TTS_PROVIDERS: { [key: string]: any } = {
     // `GET /v1/voices` once a key is set, the way it fills the Ollama models in
     // from a running Ollama. Writing ids down here would only be a guess that
     // goes stale.
-    voices: [] as { label: string; value: string }[],
+    voices: [] as ElevenLabsVoice[],
     configurable: ["model", "language", "voice"],
   },
 };

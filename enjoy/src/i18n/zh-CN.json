@@ -532,6 +532,8 @@
   "selectTtsEngine": "选择 TTS 引擎",
   "selectTtsModel": "选择 TTS 模型",
   "selectTtsVoice": "选择 TTS 音色",
+  "previewVoice": "试听音色",
+  "failedToPreviewVoice": "试听失败",
   "selectTtsLanguage": "选择 TTS 语言",
   "pleaseSelectTtsVoice": "请选择 TTS 音色",
   "youNeedToSetupApiKeyBeforeUsingOpenAI": "在使用 OpenAI 之前您需要设置 API 密钥",

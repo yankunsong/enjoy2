@@ -15,6 +15,7 @@ import { LANGUAGES } from "@/constants";
 import { t } from "i18next";
 import { useContext } from "react";
 import { AISettingsProviderContext } from "@renderer/context";
+import { VoicePreviewButton } from "./voice-preview-button";
 
 export const TTSForm = (props: { form: ReturnType<typeof useForm> }) => {
   const { form } = props;
@@ -156,7 +157,19 @@ export const TTSForm = (props: { form: ReturnType<typeof useForm> }) => {
                     voice.language === form.watch("config.tts.language")
                   ) {
                     return (
-                      <SelectItem key={voice.value} value={voice.value}>
+                      <SelectItem
+                        key={voice.value}
+                        value={voice.value}
+                        // Only where the provider hosts a sample, which today
+                        // means ElevenLabs. Azure's and OpenAI's voices are
+                        // named, not published, so those rows stay as they are
+                        // rather than growing a button that cannot play.
+                        accessory={
+                          voice.previewUrl ? (
+                            <VoicePreviewButton url={voice.previewUrl} />
+                          ) : null
+                        }
+                      >
                         <span className="capitalize">{voice.label}</span>
                       </SelectItem>
                     );

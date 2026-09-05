@@ -42,6 +42,14 @@ named by the hash of its own content. A Document's paragraph is spoken the same
 way.
 _Avoid_: TTS output, generated audio, voiceover
 
+**Preview**:
+A sample of a TTS voice that its provider already hosts — for ElevenLabs, the
+`preview_url` on every voice, the same clip its voice library plays. Not a
+Speech: nothing is synthesised, nothing is stored, and it is addressed by the
+voice rather than by a source and a text. It exists so a voice can be chosen by
+ear instead of by its description.
+_Avoid_: demo, sample, audition, try-out
+
 **Transcript**:
 The plain text of what is spoken in a Media.
 _Avoid_: subtitles, captions, script

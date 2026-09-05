@@ -6,6 +6,7 @@ import {
   useRecordings,
   useSegments,
   useNotes,
+  usePronunciationAssessments,
 } from "@renderer/hooks";
 import WaveSurfer from "wavesurfer.js";
 import Regions, {
@@ -24,6 +25,8 @@ import { SttEngineOptionEnum } from "@/types/enums";
 import { useNavigate } from "react-router-dom";
 
 const ONE_MINUTE = 60;
+/** `ONE_MINUTE` is the recording clock, which counts seconds; a Recording's own duration is in milliseconds. */
+const ONE_MINUTE_IN_MS = 60 * 1000;
 const TEN_MINUTES = 10 * ONE_MINUTE;
 
 type MediaShadowContextType = {
@@ -118,9 +121,8 @@ export const MediaShadowProvider = ({
   onCancel?: () => void;
 }) => {
   const minPxPerSec = 150;
-  const { EnjoyApp, learningLanguage, recorderConfig } = useContext(
-    AppSettingsProviderContext
-  );
+  const { EnjoyApp, learningLanguage, recorderConfig, assessmentConfig } =
+    useContext(AppSettingsProviderContext);
   const navigate = useNavigate();
 
   const [media, setMedia] = useState<AudioType | VideoType>(null);
@@ -169,6 +171,7 @@ export const MediaShadowProvider = ({
     fetchRecordings,
     loading: loadingRecordings,
   } = useRecordings(media, currentSegmentIndex);
+  const { createAssessment } = usePronunciationAssessments();
 
   const {
     startRecording,
@@ -465,12 +468,46 @@ export const MediaShadowProvider = ({
         referenceId,
         referenceText,
       })
-      .then(() =>
-        toast.success(t("recordingSaved"), { position: "bottom-right" })
-      )
+      .then((recording) => {
+        toast.success(t("recordingSaved"), { position: "bottom-right" });
+        assess(recording);
+      })
       .catch((err) =>
         toast.error(t("failedToSaveRecording" + " : " + err.message))
       );
+  };
+
+  /**
+   * Score a Recording the moment it is made, when that has been asked for.
+   *
+   * A shadowed sentence is only worth a score line if its attempts are all on
+   * it, and until now every one of them had to be scored by hand — so the line
+   * showed whichever takes somebody remembered to click, which is not a
+   * practice history. Off unless the preference is on, because each Assessment
+   * is a paid call and most takes in a session are thrown away.
+   *
+   * A failure here is reported once and dropped: the Recording is saved either
+   * way, and the button that scores it by hand is still there.
+   */
+  const assess = (recording: RecordingType) => {
+    if (!assessmentConfig?.autoAssess) return;
+    if (!recording) return;
+
+    // The same ceiling the manual path keeps, for the same reason: past a
+    // minute the assessment is slow, costly, and rarely what was wanted.
+    if (recording.duration > ONE_MINUTE_IN_MS) return;
+
+    createAssessment({
+      recording,
+      reference: recording.referenceText?.replace(/[—]/g, ", ") || "",
+      language: recording.language || media?.language || learningLanguage,
+      prosody: assessmentConfig?.assessProsody,
+    }).catch((err) =>
+      toast.error(t("failedToAssessRecording"), {
+        description: err.message,
+        position: "bottom-right",
+      })
+    );
   };
 
   const toggleRegion = (params: number[]) => {

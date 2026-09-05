@@ -9,8 +9,43 @@ import {
 import camelcaseKeys from "camelcase-keys";
 import { map, forEach, sum, filter, cloneDeep } from "lodash";
 import * as Diff from "diff";
+import {
+  mergeAssessedUtterances,
+  supportsProsodyAssessment,
+  type AssessedUtterance,
+} from "@/pronunciation-score";
 
 const THIRTY_SECONDS = 30 * 1000;
+
+/**
+ * The assessment configuration both paths share.
+ *
+ * Prosody is the one part of it that costs extra — it is an enhanced add-on,
+ * billed by the hour on top of the transcription itself — so it is asked for
+ * only when it was asked for, and only in the one locale Azure offers it in.
+ * Requesting it elsewhere would be paying for an answer that does not come.
+ */
+const assessmentConfigFor = (params: {
+  reference: string;
+  language: string;
+  prosody?: boolean;
+}) => {
+  const { reference, language, prosody } = params;
+
+  const config = new sdk.PronunciationAssessmentConfig(
+    reference,
+    sdk.PronunciationAssessmentGradingSystem.HundredMark,
+    sdk.PronunciationAssessmentGranularity.Phoneme,
+    true
+  );
+  config.phonemeAlphabet = "IPA";
+
+  if (prosody && supportsProsodyAssessment(language)) {
+    config.enableProsodyAssessment = true;
+  }
+
+  return config;
+};
 export const usePronunciationAssessments = () => {
   const { webApi, EnjoyApp } = useContext(AppSettingsProviderContext);
   const { azureSpeech } = useContext(AISettingsProviderContext);
@@ -61,6 +96,8 @@ export const usePronunciationAssessments = () => {
     reference?: string;
     targetId?: string;
     targetType?: string;
+    /** Whether to pay for prosody on top of the assessment itself. */
+    prosody?: boolean;
   }) => {
     let { recording, targetId, targetType } = params;
     if (targetId && targetType && !recording) {
@@ -85,6 +122,7 @@ export const usePronunciationAssessments = () => {
           blob,
           language,
           reference,
+          prosody: params.prosody,
         },
         config
       );
@@ -94,6 +132,7 @@ export const usePronunciationAssessments = () => {
           blob,
           language,
           reference,
+          prosody: params.prosody,
         },
         config
       );
@@ -130,6 +169,7 @@ export const usePronunciationAssessments = () => {
       blob: Blob;
       language: string;
       reference?: string;
+      prosody?: boolean;
     },
     config: sdk.SpeechConfig
   ): Promise<sdk.PronunciationAssessmentResult> => {
@@ -138,13 +178,11 @@ export const usePronunciationAssessments = () => {
       new File([blob], "audio.wav")
     );
 
-    const pronunciationAssessmentConfig = new sdk.PronunciationAssessmentConfig(
+    const pronunciationAssessmentConfig = assessmentConfigFor({
       reference,
-      sdk.PronunciationAssessmentGradingSystem.HundredMark,
-      sdk.PronunciationAssessmentGranularity.Phoneme,
-      true
-    );
-    pronunciationAssessmentConfig.phonemeAlphabet = "IPA";
+      language,
+      prosody: params.prosody,
+    });
 
     // setting the recognition language
     config.speechRecognitionLanguage = language;
@@ -190,11 +228,20 @@ export const usePronunciationAssessments = () => {
     });
   };
 
+  /**
+   * A Recording too long for one-shot recognition, scored as a whole.
+   *
+   * Azure hands back one result per utterance here, and what the Recording
+   * scored is a question the SDK does not answer — `mergeAssessedUtterances`
+   * does, rebuilding each component from what it is made of rather than
+   * averaging the utterances flat. See `src/pronunciation-score.ts`.
+   */
   const continousAssess = async (
     params: {
       blob: Blob;
       language: string;
       reference?: string;
+      prosody?: boolean;
     },
     config: sdk.SpeechConfig
   ): Promise<sdk.PronunciationAssessmentResult> => {
@@ -203,13 +250,11 @@ export const usePronunciationAssessments = () => {
       new File([blob], "audio.wav")
     );
 
-    const pronunciationAssessmentConfig = new sdk.PronunciationAssessmentConfig(
+    const pronunciationAssessmentConfig = assessmentConfigFor({
       reference,
-      sdk.PronunciationAssessmentGradingSystem.HundredMark,
-      sdk.PronunciationAssessmentGranularity.Phoneme,
-      true
-    );
-    pronunciationAssessmentConfig.phonemeAlphabet = "IPA";
+      language,
+      prosody: params.prosody,
+    });
 
     // setting the recognition language
     config.speechRecognitionLanguage = language;
@@ -219,29 +264,32 @@ export const usePronunciationAssessments = () => {
     pronunciationAssessmentConfig.applyTo(reco);
 
     return new Promise((resolve, reject) => {
-      const pronunciationResults: sdk.PronunciationAssessmentResult[] = [];
+      const utterances: AssessedUtterance[] = [];
 
-      // The event recognizing signals that an intermediate recognition result is received.
-      // You will receive one or more recognizing events as a speech phrase is recognized, with each containing
-      // more recognized speech. The event will contain the text for the recognition since the last phrase was recognized.
-      reco.recognizing = function (s, e) {
-        const str =
-          "(recognizing) Reason: " +
-          sdk.ResultReason[e.result.reason] +
-          " Text: " +
-          e.result.text;
-        console.log(str);
+      // Cancellation rejects and the session stops immediately afterwards, so
+      // both ends of the recognition would answer the same promise. The first
+      // one to speak is the one that knows why it ended.
+      let settled = false;
+      const succeed = (result: sdk.PronunciationAssessmentResult) => {
+        if (settled) return;
+        settled = true;
+        resolve(result);
+      };
+      const fail = (error: Error) => {
+        if (settled) return;
+        settled = true;
+        reject(error);
       };
 
       // The event recognized signals that a final recognition result is received.
-      // This is the final event that a phrase has been recognized.
-      // For continuous recognition, you will get one recognized event for each phrase recognized.
+      // For continuous recognition, you will get one recognized event for each
+      // phrase recognized.
       reco.recognized = function (s, e) {
-        console.log("pronunciation assessment for: ", e.result.text);
-        const pronunciation_result =
-          sdk.PronunciationAssessmentResult.fromResult(e.result);
-        pronunciationResults.push(pronunciation_result);
-        console.log("pronunciation result: ", pronunciation_result);
+        const assessed = sdk.PronunciationAssessmentResult.fromResult(e.result);
+        if (!assessed?.detailResult) return;
+
+        console.debug("pronunciation assessment for: ", e.result.text);
+        utterances.push(JSON.parse(JSON.stringify(assessed.detailResult)));
       };
 
       // The event signals that the service has stopped processing speech.
@@ -253,134 +301,39 @@ export const usePronunciationAssessments = () => {
       //    This can be caused by the end of the specified file being reached, or ~20 seconds of silence from a microphone input.
       reco.canceled = function (s, e) {
         if (e.reason === sdk.CancellationReason.Error) {
-          const str =
+          console.error(
             "(cancel) Reason: " +
-            sdk.CancellationReason[e.reason] +
-            ": " +
-            e.errorDetails;
-          console.error(str);
-          reject(new Error(e.errorDetails));
+              sdk.CancellationReason[e.reason] +
+              ": " +
+              e.errorDetails
+          );
+          fail(new Error(e.errorDetails));
         }
         reco.stopContinuousRecognitionAsync();
       };
-
-      // Signals that a new session has started with the speech service
-      reco.sessionStarted = function (s, e) {};
 
       // Signals the end of a session with the speech service.
       reco.sessionStopped = function (s, e) {
         reco.stopContinuousRecognitionAsync();
         reco.close();
-        const mergedDetailResult = mergePronunciationResults();
-        console.log("Merged detail result:", mergedDetailResult);
-        const result = {
-          pronunciationScore:
-            mergedDetailResult.PronunciationAssessment.PronScore,
-          accuracyScore:
-            mergedDetailResult.PronunciationAssessment.AccuracyScore,
-          completenessScore:
-            mergedDetailResult.PronunciationAssessment.CompletenessScore,
-          fluencyScore: mergedDetailResult.PronunciationAssessment.FluencyScore,
-          prosodyScore: mergedDetailResult.PronunciationAssessment.ProsodyScore,
-          detailResult: mergedDetailResult,
-          contentAssessmentResult: mergedDetailResult.ContentAssessmentResult,
-        };
-        resolve(result as sdk.PronunciationAssessmentResult);
-      };
 
-      const mergePronunciationResults = () => {
-        const detailResults = pronunciationResults.map((result) =>
-          JSON.parse(JSON.stringify(result.detailResult))
-        );
+        try {
+          const detailResult = mergeAssessedUtterances(utterances);
+          const scores = detailResult.PronunciationAssessment;
+          console.debug("Merged detail result:", detailResult);
 
-        const mergedDetailResult = detailResults.reduce(
-          (acc, curr) => {
-            acc.Confidence += curr.Confidence;
-            acc.Display += " " + curr.Display;
-            acc.ITN += " " + curr.ITN;
-            acc.Lexical += " " + curr.Lexical;
-            acc.MaskedITN += " " + curr.MaskedITN;
-            acc.Words.push(...curr.Words);
-            acc.PronunciationAssessment.AccuracyScore +=
-              curr.PronunciationAssessment.AccuracyScore;
-            acc.PronunciationAssessment.CompletenessScore +=
-              curr.PronunciationAssessment.CompletenessScore;
-            acc.PronunciationAssessment.FluencyScore +=
-              curr.PronunciationAssessment.FluencyScore;
-            acc.PronunciationAssessment.ProsodyScore +=
-              curr.PronunciationAssessment?.ProsodyScore ?? 0;
-            acc.PronunciationAssessment.PronScore +=
-              curr.PronunciationAssessment?.PronScore ?? 0;
-
-            acc.ContentAssessmentResult.GrammarScore +=
-              curr.ContentAssessmentResult?.GrammarScore ?? 0;
-            acc.ContentAssessmentResult.VocabularyScore +=
-              curr.ContentAssessmentResult?.VocabularyScore ?? 0;
-            acc.ContentAssessmentResult.TopicScore +=
-              curr.ContentAssessmentResult?.TopicScore ?? 0;
-
-            return acc;
-          },
-          {
-            Confidence: 0,
-            Display: "",
-            ITN: "",
-            Lexical: "",
-            MaskedITN: "",
-            Words: [],
-            PronunciationAssessment: {
-              AccuracyScore: 0,
-              CompletenessScore: 0,
-              FluencyScore: 0,
-              ProsodyScore: 0,
-              PronScore: 0,
-            },
-            ContentAssessmentResult: {
-              GrammarScore: 0,
-              VocabularyScore: 0,
-              TopicScore: 0,
-            },
-          }
-        );
-
-        mergedDetailResult.PronunciationAssessment.AccuracyScore = (
-          mergedDetailResult.PronunciationAssessment.AccuracyScore /
-          pronunciationResults.length
-        ).toFixed(2);
-        mergedDetailResult.PronunciationAssessment.CompletenessScore = (
-          mergedDetailResult.PronunciationAssessment.CompletenessScore /
-          pronunciationResults.length
-        ).toFixed(2);
-        mergedDetailResult.PronunciationAssessment.FluencyScore = (
-          mergedDetailResult.PronunciationAssessment.FluencyScore /
-          pronunciationResults.length
-        ).toFixed(2);
-        mergedDetailResult.PronunciationAssessment.ProsodyScore = (
-          mergedDetailResult.PronunciationAssessment.ProsodyScore /
-          pronunciationResults.length
-        ).toFixed(2);
-        mergedDetailResult.PronunciationAssessment.PronScore = (
-          mergedDetailResult.PronunciationAssessment.PronScore /
-          pronunciationResults.length
-        ).toFixed(2);
-
-        mergedDetailResult.Confidence =
-          mergedDetailResult.Confidence / pronunciationResults.length;
-
-        mergedDetailResult.ContentAssessmentResult.GrammarScore = (
-          mergedDetailResult.ContentAssessmentResult.GrammarScore /
-          pronunciationResults.length
-        ).toFixed(2);
-        mergedDetailResult.ContentAssessmentResult.VocabularyScore = (
-          mergedDetailResult.ContentAssessmentResult.VocabularyScore /
-          pronunciationResults.length
-        ).toFixed(2);
-        mergedDetailResult.ContentAssessmentResult.TopicScore = (
-          mergedDetailResult.ContentAssessmentResult.TopicScore /
-          pronunciationResults.length
-        ).toFixed(2);
-
-        return mergedDetailResult;
+          succeed({
+            pronunciationScore: scores.PronScore,
+            accuracyScore: scores.AccuracyScore,
+            completenessScore: scores.CompletenessScore,
+            fluencyScore: scores.FluencyScore,
+            prosodyScore: scores.ProsodyScore,
+            detailResult,
+            contentAssessmentResult: detailResult.ContentAssessmentResult,
+          } as unknown as sdk.PronunciationAssessmentResult);
+        } catch (error) {
+          fail(error as Error);
+        }
       };
 
       reco.startContinuousRecognitionAsync();

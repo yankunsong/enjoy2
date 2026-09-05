@@ -48,6 +48,25 @@ type PronunciationAssessmentWordResultType = {
       | "UnexpectedBreak"
       | "MissingBreak"
       | "Monotone";
+    /**
+     * Prosody's word-level feedback, present only when prosody assessment was
+     * asked for. The break kinds arrive as confidences rather than as an
+     * `errorType`; `wordErrorType` is what turns them into one.
+     */
+    feedback?: {
+      prosody?: {
+        break?: {
+          errorTypes?: string[];
+          unexpectedBreak?: { confidence?: number };
+          missingBreak?: { confidence?: number };
+          breakLength?: number;
+        };
+        intonation?: {
+          errorTypes?: string[];
+          monotone?: { syllablePitchDeltaConfidence?: number };
+        };
+      };
+    };
   };
   phonemes: {
     duration: number;

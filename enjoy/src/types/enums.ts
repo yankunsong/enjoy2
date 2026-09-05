@@ -13,6 +13,7 @@ export enum UserSettingKeyEnum {
   VOCABULARY = "vocabulary",
   DICTS = "dicts",
   RECORDER = "recorder",
+  ASSESSMENT = "assessment",
 }
 
 export enum SttEngineOptionEnum {

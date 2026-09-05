@@ -1,4 +1,5 @@
 import { t } from "i18next";
+import { wordErrorType } from "@/pronunciation-score";
 import {
   Popover,
   PopoverTrigger,
@@ -62,17 +63,19 @@ export const PronunciationAssessmentWordResult = (props: {
     ) : (
       <CorrectWordDisplay word={result.word} />
     ),
-    MissingBreak: errorDisplay ? (
+    MissingBreak: errorDisplay.missingBreak ? (
       <MissingBreakWordDisplay />
     ) : (
       <CorrectWordDisplay word={result.word} />
     ),
-    Monotone: errorDisplay ? (
+    Monotone: errorDisplay.monotone ? (
       <MonotoneWordDisplay word={result.word} />
     ) : (
       <CorrectWordDisplay word={result.word} />
     ),
-  }[result.pronunciationAssessment.errorType];
+    // Azure leaves `ErrorType` unset for the two break kinds and hands over a
+    // confidence instead, so what to show is worked out rather than read.
+  }[wordErrorType(result.pronunciationAssessment)];
 
   const play = () => {
     if (!audio.current || !props.src) return;

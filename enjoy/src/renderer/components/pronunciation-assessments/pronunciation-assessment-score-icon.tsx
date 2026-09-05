@@ -1,4 +1,5 @@
 import { cn } from "@renderer/lib/utils";
+import { scoreColor } from "./pronunciation-assessment-score-result";
 
 export const PronunciationAssessmentScoreIcon = (props: {
   score: number;
@@ -7,16 +8,6 @@ export const PronunciationAssessmentScoreIcon = (props: {
   onClick?: () => void;
 }) => {
   const { score, className, onClick } = props;
-
-  const scoreColor = (score: number, type: "text" | "bg" = "text") => {
-    if (!score) return "gray";
-
-    if (score >= 80) return type == "text" ? "text-green-600" : "bg-green-600";
-    if (score >= 60)
-      return type == "text" ? "text-yellow-600" : "bg-yellow-600";
-
-    return type == "text" ? "text-red-600" : "bg-yellow-600";
-  };
 
   return (
     <div

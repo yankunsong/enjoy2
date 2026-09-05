@@ -11,13 +11,10 @@ import {
   HotKeysSettingsProviderContext,
   MediaShadowProviderContext,
 } from "@renderer/context";
-import { RecordingDetail } from "@renderer/components";
-import {
-  cn,
-  formatDuration,
-  renderPitchContour,
-} from "@renderer/lib/utils";
+import { RecordingDetail, scoreColor } from "@renderer/components";
+import { cn, formatDuration, renderPitchContour } from "@renderer/lib/utils";
 import { extractFrequencies } from "@/utils";
+import { compareContours, type Likeness } from "@/likeness";
 import WaveSurfer from "wavesurfer.js";
 import Regions from "wavesurfer.js/dist/plugins/regions";
 import {
@@ -76,6 +73,7 @@ export const MediaCurrentRecording = () => {
     editingRegion,
     currentSegment,
     createSegment,
+    waveform,
     currentTime: mediaCurrentTime,
     caption,
     toggleRegion,
@@ -88,6 +86,7 @@ export const MediaCurrentRecording = () => {
 
   const [detailIsOpen, setDetailIsOpen] = useState(false);
   const [isComparing, setIsComparing] = useState(false);
+  const [likeness, setLikeness] = useState<Likeness | null>(null);
   const [isSharing, setIsSharing] = useState(false);
   const [isSelectingRegion, setIsSelectingRegion] = useState(false);
 
@@ -111,6 +110,8 @@ export const MediaCurrentRecording = () => {
     wrapper
       .querySelectorAll(".pitch-contour-recording")
       .forEach((el: HTMLDivElement) => el.remove());
+
+    setLikeness(null);
   };
 
   /*
@@ -119,6 +120,8 @@ export const MediaCurrentRecording = () => {
    */
   const renderComparingPitchContour = () => {
     if (!currentRecording) return;
+    if (!wavesurfer) return;
+    if (!waveform?.frequencies?.length) return;
 
     const region = mediaRegions
       .getRegions()
@@ -165,6 +168,32 @@ export const MediaCurrentRecording = () => {
       voiceStartFrequenciesIndex,
       voiceEndFrequenciesIndex
     );
+
+    /*
+     * The two contours are on screen together at this point, and until now
+     * that was the whole of the comparison: whether the Recording follows the
+     * sentence was left to the eye. Likeness answers it in numbers off the
+     * same two contours — see `src/likeness.ts` for what it does and does not
+     * claim to measure.
+     */
+    const mediaDuration = wavesurfer.getDuration();
+    setLikeness(
+      compareContours({
+        reference: waveform.frequencies.slice(
+          Math.round(
+            (region.start / mediaDuration) * waveform.frequencies.length
+          ),
+          Math.round((region.end / mediaDuration) * waveform.frequencies.length)
+        ),
+        actual: data,
+        referenceDuration: (region.end - region.start) * 1000,
+        actualDuration:
+          ((voiceEndIndex - voiceStartIndex) / peaks.length) *
+          player.getDuration() *
+          1000,
+      })
+    );
+
     renderMediaPitchContour(region, {
       repaint: false,
       canvasId: `pitch-contour-${currentRecording.id}-canvas`,
@@ -537,11 +566,9 @@ export const MediaCurrentRecording = () => {
       icon: GaugeCircleIcon,
       active: detailIsOpen,
       iconClassName: currentRecording?.pronunciationAssessment
-        ? currentRecording?.pronunciationAssessment.pronunciationScore >= 80
-          ? "text-green-500"
-          : currentRecording?.pronunciationAssessment.pronunciationScore >= 60
-          ? "text-yellow-600"
-          : "text-red-500"
+        ? scoreColor(
+            currentRecording.pronunciationAssessment.pronunciationScore
+          )
         : "",
       onClick: () => setDetailIsOpen(!detailIsOpen),
       asChild: false,
@@ -622,6 +649,30 @@ export const MediaCurrentRecording = () => {
           }}
           className="waveform-container"
         ></div>
+
+        {isComparing && likeness && (
+          <div
+            data-testid="recording-likeness"
+            data-tooltip-id="media-shadow-tooltip"
+            data-tooltip-content={[
+              `${t("models.likeness.intonation")}: ${likeness.intonation}`,
+              `${t("models.likeness.rhythm")}: ${likeness.rhythm}`,
+              `${t("models.likeness.tempo")}: ${likeness.tempo} (${
+                likeness.tempoRatio
+              }x)`,
+            ].join(" · ")}
+            className="absolute left-2 top-1 flex items-center space-x-1 cursor-help"
+          >
+            <span className="text-xs text-muted-foreground">
+              {t("likeness")}
+            </span>
+            <span
+              className={`text-sm font-mono ${scoreColor(likeness.overall)}`}
+            >
+              {likeness.overall}
+            </span>
+          </div>
+        )}
 
         <div className="absolute right-2 top-1">
           <span className="text-sm">{formatDuration(currentTime || 0)}</span>

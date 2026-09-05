@@ -34,6 +34,7 @@ import {
 } from "lucide-react";
 import { t } from "i18next";
 import { formatDateTime, formatDuration } from "@renderer/lib/utils";
+import { PronunciationScoreTrend, scoreColor } from "@renderer/components";
 
 export const MediaRecordings = () => {
   const { currentHotkeys } = useContext(HotKeysSettingsProviderContext);
@@ -245,6 +246,12 @@ export const MediaRecordings = () => {
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
+      <PronunciationScoreTrend
+        scores={recordings
+          .map((r) => r.pronunciationAssessment?.pronunciationScore)
+          .filter((score) => typeof score === "number")}
+      />
+
       {recordings.length == 0 && (
         <div
           className="text-center px-6 py-8 text-sm text-muted-foreground"
@@ -277,19 +284,9 @@ export const MediaRecordings = () => {
           <div className="flex items-center space-x-2">
             {recording.pronunciationAssessment?.result && (
               <div
-                className={`flex items-center space-x-1
-                    ${
-                      recording.pronunciationAssessment
-                        ? recording.pronunciationAssessment
-                            .pronunciationScore >= 80
-                          ? "text-green-500"
-                          : recording.pronunciationAssessment
-                              .pronunciationScore >= 60
-                          ? "text-yellow-600"
-                          : "text-red-500"
-                        : ""
-                    }
-                    `}
+                className={`flex items-center space-x-1 ${scoreColor(
+                  recording.pronunciationAssessment.pronunciationScore
+                )}`}
               >
                 <GaugeCircleIcon className="w-4 h-4" />
                 <span className="text-xs font-mono">

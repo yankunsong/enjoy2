@@ -26,7 +26,9 @@ export const RecordingDetail = (props: {
   const { result } = pronunciationAssessment || {};
   const [currentTime, setCurrentTime] = useState<number>(0);
 
-  const { learningLanguage } = useContext(AppSettingsProviderContext);
+  const { learningLanguage, assessmentConfig } = useContext(
+    AppSettingsProviderContext
+  );
   const { createAssessment } = usePronunciationAssessments();
   const [assessing, setAssessing] = useState(false);
 
@@ -43,6 +45,7 @@ export const RecordingDetail = (props: {
       recording,
       reference: recording.referenceText?.replace(/[—]/g, ", ") || "",
       language: recording.language || learningLanguage,
+      prosody: assessmentConfig?.assessProsody,
     })
       .then((assessment) => {
         onAssess && onAssess(assessment);

@@ -248,6 +248,21 @@ type DiskUsageType = {
   size: number;
 }[];
 
+type AssessmentConfigType = {
+  /**
+   * Whether a Recording is assessed the moment it is made, rather than when
+   * you ask. Off by default: every Assessment is a paid call against an Azure
+   * resource, and a shadowing session throws away most of its takes.
+   */
+  autoAssess: boolean;
+  /**
+   * Whether to ask for prosody — stress, intonation, speaking speed, rhythm —
+   * alongside the assessment. An enhanced add-on, billed by the hour on top of
+   * the transcription, and offered by Azure in en-US only.
+   */
+  assessProsody: boolean;
+};
+
 type RecorderConfigType = {
   autoGainControl: boolean;
   echoCancellation: boolean;
@@ -292,4 +307,3 @@ type TranscribeResultType = {
   tokenId?: number;
   url: string;
 };
-

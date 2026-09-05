@@ -58,6 +58,8 @@ type AppSettingsProviderState = {
   ahoy?: typeof ahoy;
   recorderConfig?: RecorderConfigType;
   setRecorderConfig?: (config: RecorderConfigType) => Promise<void>;
+  assessmentConfig?: AssessmentConfigType;
+  setAssessmentConfig?: (config: AssessmentConfigType) => Promise<void>;
   // remote config
   ipaMappings?: { [key: string]: string };
   displayPreferences?: boolean;
@@ -97,6 +99,11 @@ export const AppSettingsProvider = ({
     useState<VocabularyConfigType>(null);
   const [proxy, setProxy] = useState<ProxyConfigType>();
   const [recorderConfig, setRecorderConfig] = useState<RecorderConfigType>();
+  const [assessmentConfig, setAssessmentConfig] =
+    useState<AssessmentConfigType>({
+      autoAssess: false,
+      assessProsody: false,
+    });
   const [ipaMappings, setIpaMappings] = useState<{ [key: string]: string }>(
     IPA_MAPPINGS
   );
@@ -243,6 +250,21 @@ export const AppSettingsProvider = ({
       });
   };
 
+  const fetchAssessmentConfig = async () => {
+    const config = await EnjoyApp.userSettings.get(
+      UserSettingKeyEnum.ASSESSMENT
+    );
+    setAssessmentConfig(config || { autoAssess: false, assessProsody: false });
+  };
+
+  const setAssessmentConfigHandler = async (config: AssessmentConfigType) => {
+    return EnjoyApp.userSettings
+      .set(UserSettingKeyEnum.ASSESSMENT, config)
+      .then(() => {
+        setAssessmentConfig(config);
+      });
+  };
+
   const fetchVocabularyConfig = async () => {
     EnjoyApp.userSettings
       .get(UserSettingKeyEnum.VOCABULARY)
@@ -274,6 +296,7 @@ export const AppSettingsProvider = ({
       fetchLanguages();
       fetchVocabularyConfig();
       fetchRecorderConfig();
+      fetchAssessmentConfig();
     }
   }, [db.state]);
 
@@ -375,6 +398,8 @@ export const AppSettingsProvider = ({
         ahoy,
         cable,
         recorderConfig,
+        assessmentConfig,
+        setAssessmentConfig: setAssessmentConfigHandler,
         setRecorderConfig: setRecorderConfigHandler,
         ipaMappings,
         displayPreferences,

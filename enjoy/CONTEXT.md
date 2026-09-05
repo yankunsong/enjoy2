@@ -70,9 +70,21 @@ One captured attempt at shadowing a single sentence.
 _Avoid_: take, attempt, clip
 
 **Assessment**:
-Phoneme-level scoring of a Recording against the sentence it shadows, producing
-accuracy, fluency and completeness scores.
+Phoneme-level scoring of a Recording against the *text* of the sentence it
+shadows, producing accuracy, fluency, completeness and prosody scores. Judged
+against a native-speaker model, which knows nothing about the Media: a
+Recording can score well on it while sounding nothing like the original.
 _Avoid_: evaluation, scoring, grading
+
+**Likeness**:
+How closely a Recording follows the *delivery* of the sentence it shadows —
+its intonation, its rhythm and its pace — measured against the Media's own
+audio rather than a native-speaker model. The half of shadowing an Assessment
+cannot see. Computed locally from the two pitch contours, and expressed in
+semitones from each speaker's own median pitch, so it is about the shape of a
+delivery and not about whose voice traced it.
+_Avoid_: similarity, match, alignment. Alignment is a term of its own here and
+means something else entirely.
 
 **Note**:
 Something you wrote about one sentence of a Media, kept attached to it. Where a

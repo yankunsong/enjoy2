@@ -142,11 +142,20 @@ const ScoreBarComponent = ({
   );
 };
 
+/**
+ * The one place a score becomes a colour.
+ *
+ * The bands are the ones the legend beside the dial spells out: 80 and above
+ * is green, 60 and above yellow, below that red. The `bg` variant used to
+ * answer yellow for the red band, so a failing score looked the same as a
+ * passing one everywhere a score is painted rather than written — which is
+ * every progress bar and every score dot in the app.
+ */
 export const scoreColor = (score: number, type: "text" | "bg" = "text") => {
   if (!score) return "gray";
 
   if (score >= 80) return type == "text" ? "text-green-600" : "bg-green-600";
   if (score >= 60) return type == "text" ? "text-yellow-600" : "bg-yellow-600";
 
-  return type == "text" ? "text-red-600" : "bg-yellow-600";
+  return type == "text" ? "text-red-600" : "bg-red-600";
 };

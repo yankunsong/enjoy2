@@ -21,6 +21,8 @@ import {
   LearningLanguageSettings,
   NetworkState,
   RecorderSettings,
+  AssessmentSettings,
+  ProsodyAssessmentSettings,
   VocabularySettings,
   DictSettings,
   DiskUsage,
@@ -88,6 +90,10 @@ export const Preferences = () => {
           <ElevenLabsSettings />
           <Separator />
           <RecorderSettings />
+          <Separator />
+          <AssessmentSettings />
+          <Separator />
+          <ProsodyAssessmentSettings />
           <Separator />
           <ResetSettings />
           <Separator />

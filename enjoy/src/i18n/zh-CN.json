@@ -132,6 +132,11 @@
         "monotone": "这些单词以平淡且不兴奋的语调发音，没有任何节奏或表达"
       }
     },
+    "likeness": {
+      "intonation": "语调",
+      "rhythm": "节奏",
+      "tempo": "语速"
+    },
     "chatAgent": {
       "notFound": "未找到智能体",
       "created": "智能体创建成功",
@@ -538,6 +543,13 @@
   "shadowingVideo": "跟读视频",
   "shadowingExercise": "跟读训练",
   "addingResource": "正在添加资源",
+  "assessProsody": "评估韵律",
+  "assessProsodyDescription": "额外评估重音、语调、语速和节奏，并标出念得平板的句子和停顿不当的位置。韵律是 Azure 的付费附加功能，会在每次评估的费用之上另行计费，且仅支持 en-US。",
+  "autoAssessRecordings": "自动评估录音",
+  "autoAssessRecordingsDescription": "每次录完自动打分，无需手动点评估按钮。每次评估都会调用一次 Azure，产生费用。",
+  "failedToAssessRecording": "评估录音失败",
+  "likeness": "跟读相似度",
+  "scoreTrendOverAttempts": "近 {{times}} 次练习得分",
   "pronunciationAssessment": "发音评估",
   "score": "得分",
   "inputUrlToStartReading": "输入 URL 开始阅读",

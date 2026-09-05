@@ -40,3 +40,4 @@ export * from "./dict-settings";
 
 
 export * from "./deposit";
+export * from "./assessment-settings";

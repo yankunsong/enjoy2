@@ -132,6 +132,11 @@
         "monotone": "The word is monotone."
       }
     },
+    "likeness": {
+      "intonation": "Intonation",
+      "rhythm": "Rhythm",
+      "tempo": "Tempo"
+    },
     "chatAgent": {
       "notFound": "Chat agent not found",
       "created": "Chat agent created",
@@ -538,6 +543,13 @@
   "shadowingVideo": "Shadowing video",
   "shadowingExercise": "Shadowing exercise",
   "addingResource": "Adding resource",
+  "assessProsody": "Assess prosody",
+  "assessProsodyDescription": "Also score stress, intonation, speaking speed and rhythm, and mark monotone delivery and misplaced pauses. Prosody is a paid Azure add-on billed on top of each assessment, and is available for en-US only.",
+  "autoAssessRecordings": "Assess recordings automatically",
+  "autoAssessRecordingsDescription": "Score every new recording as soon as it is made, instead of pressing the assessment button. Each assessment is a paid call to Azure.",
+  "failedToAssessRecording": "Failed to assess the recording",
+  "likeness": "Likeness",
+  "scoreTrendOverAttempts": "Score over {{times}} attempts",
   "pronunciationAssessment": "Pronunciation assessment",
   "score": "score",
   "inputUrlToStartReading": "Input url to start reading",

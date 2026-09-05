@@ -132,6 +132,11 @@
         "monotone": "La palabra es monótona."
       }
     },
+    "likeness": {
+      "intonation": "Entonación",
+      "rhythm": "Ritmo",
+      "tempo": "Velocidad"
+    },
     "chatAgent": {
       "notFound": "Agente de chat no encontrado",
       "created": "Agente de chat creado",
@@ -538,6 +543,13 @@
   "shadowingVideo": "Video para shadowing",
   "shadowingExercise": "Ejercicio de shadowing",
   "addingResource": "Agregando recurso",
+  "assessProsody": "Evaluar la prosodia",
+  "assessProsodyDescription": "Puntúa además el acento, la entonación, la velocidad y el ritmo, y señala la lectura monótona y las pausas fuera de lugar. La prosodia es un complemento de pago de Azure que se factura aparte de cada evaluación, y solo está disponible en en-US.",
+  "autoAssessRecordings": "Evaluar grabaciones automáticamente",
+  "autoAssessRecordingsDescription": "Puntúa cada grabación nueva en cuanto se hace, sin pulsar el botón de evaluación. Cada evaluación es una llamada de pago a Azure.",
+  "failedToAssessRecording": "No se pudo evaluar la grabación",
+  "likeness": "Semejanza",
+  "scoreTrendOverAttempts": "Puntuación en {{times}} intentos",
   "pronunciationAssessment": "Evaluación de pronunciación",
   "score": "puntuación",
   "inputUrlToStartReading": "Ingresa una URL para comenzar a leer",

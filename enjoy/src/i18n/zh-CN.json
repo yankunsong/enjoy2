@@ -962,6 +962,8 @@
   "writeYourDiaryHere": "在这里写日记……",
   "writeSomethingToGenerateSpeech": "先写点内容，然后就可以生成语音了。",
   "generateSpeech": "生成语音",
+  "regenerateSpeech": "重新生成",
+  "speechWasSpokenInAnotherVoice": "这段语音是用另一个音色生成的。点击重新生成来听你现在选的音色。",
   "startShadowing": "跟读练习",
   "saving": "保存中……",
   "deleteDiaryConfirm": "确定删除这篇日记吗？已经练习过的音频会保留。",

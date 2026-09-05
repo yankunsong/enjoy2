@@ -962,6 +962,8 @@
   "writeYourDiaryHere": "Escribe tu diario aquí...",
   "writeSomethingToGenerateSpeech": "Escribe algo primero y luego podrás generar el audio.",
   "generateSpeech": "Generar audio",
+  "regenerateSpeech": "Regenerar",
+  "speechWasSpokenInAnotherVoice": "Este audio se generó con otra voz. Regenéralo para escuchar la que elegiste.",
   "startShadowing": "Practicar shadowing",
   "saving": "Guardando...",
   "deleteDiaryConfirm": "¿Seguro que quieres eliminar este diario? El audio con el que ya has practicado se conservará.",

@@ -72,6 +72,22 @@ const SAMPLE_DOOMED_DRAFT_AUDIO = path.join(
   "doomed-diary-draft.mp3"
 );
 
+// The two voices one Diary is spoken in, before and after the voice is changed
+// in its settings. Two files because a different voice is different audio —
+// that is the whole reason for changing it — and the Speech that survives has
+// to be the one made of the second lot of bytes.
+const SAMPLE_FIRST_VOICE_AUDIO = path.join(
+  process.cwd(),
+  "test-results",
+  "first-voice-diary-speech.mp3"
+);
+
+const SAMPLE_SECOND_VOICE_AUDIO = path.join(
+  process.cwd(),
+  "test-results",
+  "second-voice-diary-speech.mp3"
+);
+
 // What two Diaries writing the same sentence are both spoken with, since that
 // is exactly what the synthesis service would hand back to each of them.
 const SAMPLE_SHARED_AUDIO = path.join(
@@ -348,6 +364,8 @@ test.beforeAll(async () => {
   buildAudio(SAMPLE_DOOMED_SPEECH_AUDIO, 4);
   buildAudio(SAMPLE_DOOMED_DRAFT_AUDIO, 5);
   buildAudio(SAMPLE_SHARED_AUDIO, 6);
+  buildAudio(SAMPLE_FIRST_VOICE_AUDIO, 14);
+  buildAudio(SAMPLE_SECOND_VOICE_AUDIO, 15);
   buildAudio(SAMPLE_CHAT_SPEECH_AUDIO, 7);
   fs.outputFileSync(SAMPLE_SHARED_DOCUMENT, `${SHARED_TEXT}\n`);
   buildAudio(SAMPLE_DIARY_RECORDING, 2);
@@ -1093,8 +1111,11 @@ test("kept the Timeline across that restart too, which is what there is to click
  * a Diary is stored — a Diary is whatever comes back out of these channels.
  */
 
-const createDiary = (params: { title?: string; content?: string }) =>
-  ipc("diaries-create", params);
+const createDiary = (params: {
+  title?: string;
+  content?: string;
+  config?: Record<string, any>;
+}) => ipc("diaries-create", params);
 
 const updateDiary = (
   id: string,
@@ -2186,6 +2207,95 @@ test("takes them down the ChatAgent path too, which deletes through hooks of its
 
   expect(fs.existsSync(speechPath)).toBe(false);
   expect(fs.existsSync(recordingPath)).toBe(false);
+});
+
+/**
+ * Changing a Diary's voice and speaking it again.
+ *
+ * The voice is not part of how a Speech is found — that is the text and the
+ * source, and nothing else — so a new voice on its own changes nothing anybody
+ * can hear. The panel answers with a Regenerate button, and this is the
+ * sequence behind it: say the Diary in the new voice, then destroy what it said
+ * in the old one.
+ *
+ * The order is the point. Synthesis is the step that can fail, so it goes
+ * first: a spent quota leaves the Diary with the audio it had rather than with
+ * none. And the destruction leaves exactly one Speech behind, because two
+ * Speeches for one text and one source is a question `speeches-find-one` has no
+ * way to answer — it returns one, and which one is the database's business.
+ */
+
+const RESPOKEN_TEXT = "The lighthouse kept its light on long after sunrise.";
+
+let respokenDiaryId: string;
+let firstVoiceSpeechId: string;
+let firstVoiceFile: string;
+
+const SECOND_VOICE = { ...VOICE, voice: "Adam" };
+
+test("speaks a Diary in the voice its settings named", async () => {
+  const created = await createDiary({
+    content: RESPOKEN_TEXT,
+    config: { tts: VOICE },
+  });
+  expect(created.status).toBe(200);
+  respokenDiaryId = created.body.result.id;
+
+  const spoken = await createSpeech(
+    respokenDiaryId,
+    RESPOKEN_TEXT,
+    SAMPLE_FIRST_VOICE_AUDIO
+  );
+  expect(spoken.status).toBe(200);
+
+  firstVoiceSpeechId = spoken.body.result.id;
+  firstVoiceFile = await speechFile(spoken.body.result.filename);
+  expect(fs.existsSync(firstVoiceFile)).toBe(true);
+});
+
+test("still finds the old Speech after the voice alone is changed", async () => {
+  const changed = await updateDiary(respokenDiaryId, {
+    config: { tts: SECOND_VOICE },
+  });
+  expect(changed.status).toBe(200);
+
+  // Which is the whole difficulty: the setting is saved, and the Diary goes on
+  // saying what it said, in the voice it is no longer set to. Nothing here can
+  // fix that — only speaking it again can — so the panel says so instead.
+  const { body } = await findSpeech(respokenDiaryId, RESPOKEN_TEXT);
+  expect(body.result.id).toBe(firstVoiceSpeechId);
+  expect(body.result.configuration.voice).toBe(VOICE.voice);
+});
+
+test("leaves one Speech, in the new voice, once it is spoken again", async () => {
+  const respoken = await ipc(
+    "speeches-create",
+    {
+      sourceId: respokenDiaryId,
+      sourceType: "Diary",
+      text: RESPOKEN_TEXT,
+      section: 0,
+      segment: 0,
+      configuration: SECOND_VOICE,
+    },
+    blobOf(SAMPLE_SECOND_VOICE_AUDIO, "audio/mp3")
+  );
+  expect(respoken.status).toBe(200);
+  expect(respoken.body.result.id).not.toBe(firstVoiceSpeechId);
+
+  // Only now, with the new audio safely stored, does the old go.
+  expect((await ipc("speeches-delete", firstVoiceSpeechId)).status).toBe(200);
+
+  const { body } = await findSpeech(respokenDiaryId, RESPOKEN_TEXT);
+  expect(body.result.id).toBe(respoken.body.result.id);
+  expect(body.result.configuration.voice).toBe(SECOND_VOICE.voice);
+
+  // And the file of the voice nobody chose any more goes with its record,
+  // rather than accumulating in the Library once per change of mind.
+  expect(fs.existsSync(firstVoiceFile)).toBe(false);
+  expect(
+    fs.existsSync(await speechFile(respoken.body.result.filename))
+  ).toBe(true);
 });
 
 test("reached Hosted Enjoy at no point along the way", async () => {

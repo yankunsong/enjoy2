@@ -962,6 +962,8 @@
   "writeYourDiaryHere": "Write your diary here...",
   "writeSomethingToGenerateSpeech": "Write something first, then you can generate speech from it.",
   "generateSpeech": "Generate speech",
+  "regenerateSpeech": "Regenerate",
+  "speechWasSpokenInAnotherVoice": "This audio was spoken in a different voice. Regenerate to hear the one you chose.",
   "startShadowing": "Shadow this",
   "saving": "Saving...",
   "deleteDiaryConfirm": "Are you sure to delete this diary? The audio you have already practised against will be kept.",

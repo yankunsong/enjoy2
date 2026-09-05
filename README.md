@@ -11,16 +11,33 @@
 
 ## 快速开始
 
-需要 **Node ≥ 20**。Yarn 由仓库自带的 `packageManager` 指定，无需自行安装版本。
+需要 **Node ≥ 20**。
+
+Yarn 的版本由仓库自带（`.yarn/releases/yarn-4.6.0.cjs`），但你的机器上得先有 `yarn`
+这个命令。没有的话用 Node 自带的 corepack 装一个：
+
+```bash
+corepack enable
+```
+
+然后：
 
 ```bash
 yarn install
 yarn enjoy:web
 ```
 
-浏览器打开 **http://127.0.0.1:7101**
+启动成功时终端最后会打印：
 
-两个服务（前端 7101、本地服务 7100）都只监听回环地址，同一网络里的其他机器访问不到。
+```
+Local Web Enjoy UI listening on http://127.0.0.1:7101/
+```
+
+浏览器打开 **http://127.0.0.1:7101**。
+
+用 `127.0.0.1` 或 `localhost` 访问，不要用本机的局域网 IP——浏览器只在这两个地址下
+把页面当作安全上下文，否则录音拿不到麦克风权限。两个服务（前端 7101、本地服务 7100）
+本来也只监听回环地址，同一网络里的其他机器访问不到。
 
 停止：在终端按 `Ctrl-C`。
 
@@ -44,11 +61,9 @@ cp enjoy/.env.example enjoy/.env
 直接在 **Preferences → 高级设置** 里填。两种方式可以混用：环境变量里设了的覆盖已存的，
 没设的不动。
 
-**查词功能**需要额外下载词典（可选，不影响启动）：
-
-```bash
-yarn workspace enjoy download
-```
+**查词功能目前在网页版不可用**——内置的 Cambridge 词典和自定义 mdict 词典，它们的
+handler 只在 Electron 宿主里注册（`camdict-lookup`、`mdict-lookup`、`dict-list`
+在这里都会答"没有注册 handler"）。跟读和评分不受影响。
 
 ---
 

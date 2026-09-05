@@ -7,6 +7,12 @@ import { defineConfig, devices } from "@playwright/test";
 // require('dotenv').config();
 
 /**
+ * The specs that drive a packaged Electron build, and the only ones that do.
+ * Everything else in e2e/ is plain Node.
+ */
+const ELECTRON_SPECS = [/main\.spec\.ts$/, /renderer\.spec\.ts$/];
+
+/**
  * See https://playwright.dev/docs/test-configuration.
  */
 export default defineConfig({
@@ -31,13 +37,24 @@ export default defineConfig({
   },
   timeout: 60000,
 
-  /* Configure projects for major browsers */
-  // projects: [
-  //   {
-  //     name: "chromium",
-  //     use: { ...devices["Desktop Chrome"] },
-  //   },
-  // ],
+  /*
+   * The suites, split by what a spec needs in order to run.
+   *
+   * `electron` drives a packaged build and so has to wait behind
+   * `yarn package` on every runner it is tried on. `node` needs nothing built
+   * at all — it starts the local server itself, or reads source files where it
+   * is only checking that two declarations agree — so it runs on one cheap
+   * runner in seconds.
+   *
+   * `node` is declared as the complement of `electron` rather than a list of
+   * its own, so a spec added tomorrow belongs to a project, a script and a CI
+   * job without anybody remembering to wire it up. e2e/suites.spec.ts holds
+   * that chain to it.
+   */
+  projects: [
+    { name: "electron", testMatch: ELECTRON_SPECS },
+    { name: "node", testIgnore: ELECTRON_SPECS },
+  ],
 
   /* Run your local dev server before starting the tests */
   // webServer: {

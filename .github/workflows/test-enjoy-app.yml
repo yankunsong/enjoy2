@@ -13,6 +13,39 @@ on:
     paths:
       - "enjoy/**"
 jobs:
+  # The `node` project: every suite that needs nothing built. Why the split
+  # falls where it does is in enjoy/playwright.config.ts; what it buys is this
+  # job — one cheap runner, no packaging in front of it, an answer in seconds.
+  node-test:
+    timeout-minutes: 15
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - uses: actions/cache@v4
+        with:
+          path: "**/node_modules"
+          # Distinct from the packaging job's key, which this job's runner
+          # would otherwise share and race to save.
+          key: node-suite-ubuntu-latest-${{ hashFiles('**/yarn.lock') }}
+
+      - name: Install dependencies
+        run: yarn install
+
+      - name: Run the suites that need no build
+        run: yarn enjoy:test:node
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: node-playwright-report
+          path: enjoy/playwright-report/
+          retention-days: 30
+
   e2e-test:
     timeout-minutes: 60
     runs-on: ${{ matrix.os }}
@@ -56,32 +89,16 @@ jobs:
           sudo chown root:root enjoy/out/Enjoy-linux-x64/chrome-sandbox
           sudo chmod 4755 enjoy/out/Enjoy-linux-x64/chrome-sandbox
 
-      - name: Run main tests with xvfb-run on Ubuntu
-        # continue-on-error: true
+      - name: Run the Electron suite with xvfb-run on Ubuntu
         if: contains(matrix.os, 'ubuntu')
         env:
           DEBUG: pw:browser*
         run: |
-          xvfb-run --auto-servernum --server-args="-screen 0 1280x960x24" -- yarn enjoy:test:main
+          xvfb-run --auto-servernum --server-args="-screen 0 1280x960x24" -- yarn enjoy:test:electron
 
-      - name: Run main tests on Windows
-        continue-on-error: true
-        if: contains(matrix.os, 'windows')
-        run: yarn enjoy:test:main
-
-      - name: Run main tests on macOS
-        if: contains(matrix.os, 'macos')
-        run: yarn enjoy:test:main
-
-      - name: Run renderer tests with xvfb-run on Ubuntu
-        # continue-on-error: true
-        if: contains(matrix.os, 'ubuntu')
-        run: |
-          xvfb-run --auto-servernum --server-args="-screen 0 1280x960x24" -- yarn enjoy:test:renderer
-
-      - name: Run renderer tests on macOS or Windows
+      - name: Run the Electron suite on macOS or Windows
         if: contains(matrix.os, 'macos') || contains(matrix.os, 'windows')
-        run: yarn enjoy:test:renderer
+        run: yarn enjoy:test:electron
 
       # - name: Make App
       #   run: yarn enjoy:make

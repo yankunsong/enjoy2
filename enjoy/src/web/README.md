@@ -206,9 +206,19 @@ constant you can edit. See [ADR 0003](../../docs/adr/0003-fake-local-user-instea
 
 ## Tests
 
-`yarn workspace enjoy test:web` runs `e2e/web-server.spec.ts`, which drives the
-local server's HTTP surface. That surface is the only seam this feature is
-tested on; the browser half is judged by hand, by design — see issue #1.
+`yarn workspace enjoy test:node` runs `e2e/web-server.spec.ts`, which drives
+the local server's HTTP surface, along with every other spec that needs no
+packaged build — the channel-list guard among them. It is one of the two
+Playwright projects the suite is split into, and CI gives it a job of its own,
+on one cheap runner with no packaging in front of it.
+
+A spec added to `e2e/` joins that project without anybody wiring it up, because
+the project is declared as everything the Electron one is not.
+`e2e/suites.spec.ts` holds the chain to that: a spec belongs to a project, a
+project is run by a script, a script is called by the workflow.
+
+That surface is the only seam this feature is tested on; the browser half is
+judged by hand, by design — see issue #1.
 
 Shadowing is checked on that seam as far as it reaches. The audio the browser
 holds aligns into a Timeline; the bytes it holds arrive as a Recording with a

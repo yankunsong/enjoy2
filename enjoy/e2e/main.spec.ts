@@ -1,4 +1,5 @@
-import { expect, test } from "@playwright/test";
+import { _electron as electron, expect, test } from "@playwright/test";
+import type { ElectronApplication, Page } from "@playwright/test";
 import {
   clickMenuItemById,
   findLatestBuild,
@@ -8,7 +9,6 @@ import {
   ipcMainInvokeHandler,
   ipcRendererInvoke,
 } from "electron-playwright-helpers";
-import { ElectronApplication, Page, _electron as electron } from "playwright";
 import path from "path";
 import fs from "fs-extra";
 

@@ -54,7 +54,10 @@ PLIST
 #!/bin/bash
 LAUNCHER="$LAUNCHER"
 
-if [ ! -r "\$LAUNCHER" ]; then
+# Reading a byte, rather than testing -r: on a volume macOS is withholding, the
+# metadata still answers and only the content does not, so -r passes and the
+# refusal arrives later as a bare "Operation not permitted" nobody sees.
+if ! head -c 1 "\$LAUNCHER" >/dev/null 2>&1; then
   osascript >/dev/null 2>&1 <<'ALERT'
 display alert "Enjoy 无法读取仓库" message "仓库在外置磁盘上，而 macOS 默认不允许应用读取外置卷。
 
@@ -73,6 +76,11 @@ LAUNCH
   chmod +x "$app/Contents/MacOS/launch"
 
   [ -f "$ICON" ] && cp "$ICON" "$app/Contents/Resources/AppIcon.icns"
+
+  # An ad-hoc signature, so that the privacy settings have a bundle identity to
+  # attach a decision to. Unsigned, the decision hangs off the path alone, and
+  # is the kind of grant that quietly stops applying.
+  codesign --force --sign - "$app" >/dev/null 2>&1 || true
 
   # Tells the Finder to read the bundle it has just been handed, rather than
   # showing the generic icon until something else prompts it to look.

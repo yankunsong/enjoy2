@@ -4,6 +4,11 @@ This is a personal fork, run by one person on one machine. It exists to be
 used, not to be shipped: there are no other users, no releases, and no support
 obligations to anyone.
 
+These are this repository's conventions, not the project's. If you forked it to
+run Enjoy some other way — as the Electron app, against enjoy.bot, on more than
+one machine — then rewriting this file is the first change to make, before the
+rules below start costing you work they were never meant to cost.
+
 ## Only Local Web Enjoy is run
 
 Of the three distributions the domain docs name, only **Local Web Enjoy** is

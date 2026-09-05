@@ -80,6 +80,15 @@ const SAMPLE_SHARED_AUDIO = path.join(
   "shared-diary-speech.mp3"
 );
 
+// What the ChatMessage of a leaving member is spoken with. Its own bytes for
+// the same reason: the file goes only when the last Speech naming it does, so
+// audio shared with another test's Speech would outlive this one's.
+const SAMPLE_CHAT_SPEECH_AUDIO = path.join(
+  process.cwd(),
+  "test-results",
+  "chat-message-speech.mp3"
+);
+
 // A Document that says what the Diaries above say, for the half of the rule
 // that crosses kinds. Plain text, because importing one is a copy into the
 // Library rather than a parse.
@@ -284,6 +293,7 @@ test.beforeAll(async () => {
   buildAudio(SAMPLE_DOOMED_SPEECH_AUDIO, 4);
   buildAudio(SAMPLE_DOOMED_DRAFT_AUDIO, 5);
   buildAudio(SAMPLE_SHARED_AUDIO, 6);
+  buildAudio(SAMPLE_CHAT_SPEECH_AUDIO, 7);
   fs.outputFileSync(SAMPLE_SHARED_DOCUMENT, `${SHARED_TEXT}\n`);
   buildAudio(SAMPLE_DIARY_RECORDING, 2);
   buildSampleLongStereo();
@@ -1741,6 +1751,112 @@ test("deletes a Diary that was never spoken, rather than failing", async () => {
   const { status } = await ipc("diaries-destroy", written.id);
   expect(status).toBe(200);
   expect(await diaryIds()).not.toContain(written.id);
+});
+
+/**
+ * A ChatMember leaving, which takes with it every ChatMessage that member
+ * spoke — and, under each of those, a Speech and the mp3 the Speech names.
+ *
+ * Chat is a feature Local Web Enjoy's pages never reach, but its deletion path
+ * owns Speeches exactly as a Diary's does, and the rule that a file goes with
+ * the last record naming it has to hold here too. Asserted at the same seam as
+ * the rest, because that is where the handlers answer.
+ */
+
+const CHAT_SPOKEN_TEXT = "Every boat came back before the weather turned.";
+
+let leavingMemberId: string;
+let spokenChatMessageId: string;
+let chatSpeech: any;
+
+test("stands a chat up with two agents, and a spoken message from one", async () => {
+  const agents = [];
+  for (const name of ["Leaving", "Staying"]) {
+    const created = await ipc("chat-agents-create", {
+      name,
+      type: "GPT",
+      language: "en-US",
+      description: `${name} agent`,
+      config: { prompt: "Talk about the harbour." },
+    });
+    expect(created.status).toBe(200);
+    agents.push(created.body.result);
+  }
+
+  // Two agents, because a chat refuses to lose its last one: the member under
+  // test can only leave if somebody stays behind.
+  const chat = await ipc("chats-create", {
+    name: "The harbour",
+    config: { sttEngine: "whisper" },
+    members: agents.map((agent: any) => ({
+      userId: agent.id,
+      userType: "ChatAgent",
+      config: {},
+    })),
+  });
+  expect(chat.status).toBe(200);
+
+  const members = (
+    await ipc("chat-members-find-all", {
+      where: { chatId: chat.body.result.id },
+    })
+  ).body.result;
+  leavingMemberId = members.find(
+    (member: any) => member.userId === agents[0].id
+  ).id;
+
+  const message = await ipc("chat-messages-create", {
+    chatId: chat.body.result.id,
+    memberId: leavingMemberId,
+    content: CHAT_SPOKEN_TEXT,
+  });
+  expect(message.status).toBe(200);
+  spokenChatMessageId = message.body.result.id;
+
+  const spoken = await ipc(
+    "speeches-create",
+    {
+      sourceId: spokenChatMessageId,
+      sourceType: "ChatMessage",
+      text: CHAT_SPOKEN_TEXT,
+      section: 0,
+      segment: 0,
+      configuration: VOICE,
+    },
+    blobOf(SAMPLE_CHAT_SPEECH_AUDIO, "audio/mp3")
+  );
+  expect(spoken.status).toBe(200);
+  chatSpeech = spoken.body.result;
+
+  // What the removal below has to take away, confirmed present first.
+  expect(fs.existsSync(await speechFile(chatSpeech.filename))).toBe(true);
+});
+
+test("takes the leaving member's messages, their Speeches and their files", async () => {
+  const removed = await ipc("chat-members-destroy", leavingMemberId);
+  expect(removed.status).toBe(200);
+
+  // Read once rather than polled: over HTTP a fire-and-forget destroy would
+  // settle before the next request is parsed anyway, so this cannot tell an
+  // awaited destroy from an unawaited one — but polling would hide even the
+  // difference the seam can see, and the record has to be gone by the time the
+  // member is answered as removed.
+  const message = await ipc("chat-messages-find-one", {
+    id: spokenChatMessageId,
+  });
+  expect(message.status).toBe(200);
+  expect(message.body.result).toBeNull();
+
+  const speech = await ipc("speeches-find-one", {
+    sourceId: spokenChatMessageId,
+    sourceType: "ChatMessage",
+  });
+  expect(speech.status).toBe(200);
+  expect(speech.body.result).toBeNull();
+
+  // The mp3 too: nothing speaks those bytes any more, and a Library filling
+  // with audio for messages nobody can read is what the hook exists to prevent.
+  expect(fs.existsSync(await speechFile(chatSpeech.filename))).toBe(false);
 });
 
 test("reached Hosted Enjoy at no point along the way", async () => {

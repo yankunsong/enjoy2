@@ -45,16 +45,41 @@ class SpeechesHandler {
     const md5 = await hashFile(file, { algo: "md5" });
     fs.renameSync(file, path.join(path.dirname(file), `${md5}.${format}`));
 
-    // The same text in the same voice synthesises to the same bytes, and md5 is
-    // unique — so synthesising it twice is a collision, not a failure. Say so
-    // by handing back what is already there. Reachable from a Diary, whose text
-    // can be edited back to what it said before.
-    const existing = await Speech.findOne({ where: { md5 } });
+    // The same text in the same voice synthesises to the same bytes, so
+    // synthesising it twice is a collision, not a failure: say so by handing
+    // back what is already there. Reachable from a Diary, whose text can be
+    // edited back to what it said before.
+    //
+    // The collision is with what this source already said, not with the bytes
+    // alone. A file is named by its own content and so is shared by everything
+    // that speaks it, but a Speech is looked up by the source that spoke it —
+    // so two Diaries saying the same sentence need a Speech each, or the second
+    // one finds the first one's and reads it as nothing.
+    //
+    // Section and segment are settled here rather than left to the column's
+    // default, so that what is stored and what is looked up cannot drift: a
+    // caller that names neither — a Message — is one of each.
+    const { section = 0, segment = 0, ...source } = params;
+    const existing = await Speech.findOne({
+      where: {
+        md5,
+        sourceId: source.sourceId,
+        sourceType: source.sourceType,
+        section,
+        segment,
+      },
+    });
     if (existing) {
       return existing.toJSON();
     }
 
-    return Speech.create({ ...params, extname: `.${format}`, md5 })
+    return Speech.create({
+      ...source,
+      section,
+      segment,
+      extname: `.${format}`,
+      md5,
+    })
       .then((speech) => {
         return speech.toJSON();
       })

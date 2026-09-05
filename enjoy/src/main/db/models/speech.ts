@@ -12,7 +12,6 @@ import {
   Model,
   DataType,
   AllowNull,
-  Unique,
 } from "sequelize-typescript";
 import mainWindow from "@main/window";
 import fs from "fs-extra";
@@ -85,7 +84,13 @@ export class Speech extends Model<Speech> {
   @Column(DataType.JSON)
   configuration: any;
 
-  @Unique
+  /**
+   * The hash of the audio, which is also the name of the file on disk.
+   *
+   * Not unique, and never was: everything that speaks the same text in the same
+   * voice gets the same bytes, and shares the one file underneath. What is
+   * unique is a Speech per source — see the speeches handler.
+   */
   @Column(DataType.STRING)
   md5: string;
 
@@ -167,9 +172,25 @@ export class Speech extends Model<Speech> {
     this.notify(speech, "destroy");
   }
 
+  /**
+   * Takes the file with the record, unless somebody else is still speaking it.
+   *
+   * A file is named by the hash of its own content, so two sources that say the
+   * same thing in the same voice point at one mp3. Deleting a Diary must not
+   * empty the player of another Diary that happens to say the same sentence.
+   *
+   * Counted inside whatever transaction the destroy is running in, so that the
+   * row on its way out is not counted as a reason to keep the file.
+   */
   @AfterDestroy
-  static cleanupFile(speech: Speech) {
-    fs.remove(speech.filePath);
+  static async cleanupFile(speech: Speech, options?: { transaction?: any }) {
+    const stillSpoken = await Speech.count({
+      where: { md5: speech.md5 },
+      transaction: options?.transaction,
+    });
+    if (stillSpoken > 0) return;
+
+    await fs.remove(speech.filePath);
   }
 
   static notify(speech: Speech, action: "create" | "update" | "destroy") {

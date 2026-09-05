@@ -24,8 +24,10 @@ the audio is derived from the text by Speech synthesis.
 _Avoid_: note, document, journal, entry
 
 **Speech**:
-Audio synthesised from a piece of text, addressed by the text it speaks. The
-bridge from a Diary to something shadowable.
+Audio synthesised from a piece of text, addressed by its source and the text it
+speaks. The bridge from a Diary to something shadowable. Two sources saying the
+same thing in the same voice are two Speeches sharing one file, since a file is
+named by the hash of its own content.
 _Avoid_: TTS output, generated audio, voiceover
 
 **Transcript**:

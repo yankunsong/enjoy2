@@ -72,6 +72,23 @@ const SAMPLE_DOOMED_DRAFT_AUDIO = path.join(
   "doomed-diary-draft.mp3"
 );
 
+// What two Diaries writing the same sentence are both spoken with, since that
+// is exactly what the synthesis service would hand back to each of them.
+const SAMPLE_SHARED_AUDIO = path.join(
+  process.cwd(),
+  "test-results",
+  "shared-diary-speech.mp3"
+);
+
+// A Document that says what the Diaries above say, for the half of the rule
+// that crosses kinds. Plain text, because importing one is a copy into the
+// Library rather than a parse.
+const SAMPLE_SHARED_DOCUMENT = path.join(
+  process.cwd(),
+  "test-results",
+  "shared-document.txt"
+);
+
 // The Recording made against the Media that Speech becomes. A Recording
 // deduplicates by content too, and globally rather than per Media, so bytes
 // another test already recorded would hand this one that test's Recording
@@ -266,6 +283,8 @@ test.beforeAll(async () => {
   buildAudio(SAMPLE_SPEECH_AUDIO, 3);
   buildAudio(SAMPLE_DOOMED_SPEECH_AUDIO, 4);
   buildAudio(SAMPLE_DOOMED_DRAFT_AUDIO, 5);
+  buildAudio(SAMPLE_SHARED_AUDIO, 6);
+  fs.outputFileSync(SAMPLE_SHARED_DOCUMENT, `${SHARED_TEXT}\n`);
   buildAudio(SAMPLE_DIARY_RECORDING, 2);
   buildSampleLongStereo();
   ytDlpControl({});
@@ -1264,9 +1283,9 @@ test("leaves the Speech of the text it used to say exactly where it was", async 
 test("hands back the Speech already stored when the same bytes arrive again", async () => {
   const again = await createSpeech(spokenDiaryId, SPOKEN_TEXT);
 
-  // The same text in the same voice synthesises to the same bytes, and a
-  // Speech is unique by them — so this is a collision rather than a failure,
-  // and undoing an edit costs nothing.
+  // The same text in the same voice synthesises to the same bytes, and one
+  // Diary speaks a given text once — so this is a collision rather than a
+  // failure, and undoing an edit costs nothing.
   expect(again.status).toBe(200);
   expect(again.body.result.id).toBe(diarySpeech.id);
 
@@ -1274,6 +1293,140 @@ test("hands back the Speech already stored when the same bytes arrive again", as
   // stored Speech is already playing from. Arriving again must not empty it.
   const file = await speechFile(diarySpeech.filename);
   expect(fs.statSync(file).size).toBe(fs.statSync(SAMPLE_AUDIO).size);
+});
+
+/**
+ * The same sentence, written in two Diaries.
+ *
+ * Identical text in the identical voice comes back from the synthesis service
+ * as identical bytes, and a Speech's file is named by the hash of its own
+ * content — so the two Diaries are always going to share one mp3. What each of
+ * them needs is a Speech of its own naming that file, because a Speech is
+ * looked up by the Diary that spoke it, and one that belongs to the other
+ * Diary answers nothing.
+ *
+ * The same holds across kinds: a Document paragraph and a Diary that say the
+ * same sentence are two Speeches too. Which is why deleting one of them cannot
+ * be allowed to take the file the other is playing from.
+ */
+
+const SHARED_TEXT = "The wind got up in the night and took the apples down.";
+
+let sharedDiaryId: string;
+let sharingDiaryId: string;
+let documentId: string;
+let sharedSpeech: any;
+
+test("keeps a Speech for each of two Diaries that say the same thing", async () => {
+  sharedDiaryId = (await createDiary({ content: SHARED_TEXT })).body.result.id;
+  sharingDiaryId = (await createDiary({ content: SHARED_TEXT })).body.result.id;
+
+  for (const id of [sharedDiaryId, sharingDiaryId]) {
+    const created = await createSpeech(id, SHARED_TEXT, SAMPLE_SHARED_AUDIO);
+    expect(created.status).toBe(200);
+  }
+
+  // Asked the way the editor asks on the next visit, which is where the second
+  // Diary used to find nothing and offer to spend another synthesis arriving at
+  // bytes the Library already held.
+  const first = (await findSpeech(sharedDiaryId, SHARED_TEXT)).body.result;
+  const second = (await findSpeech(sharingDiaryId, SHARED_TEXT)).body.result;
+  sharedSpeech = second;
+
+  expect(first?.sourceId).toBe(sharedDiaryId);
+  expect(second?.sourceId).toBe(sharingDiaryId);
+  expect(second.id).not.toBe(first.id);
+
+  // Two Speeches, one file: what is shared is the audio, not the record of who
+  // spoke it.
+  expect(second.filename).toBe(first.filename);
+  expect(fs.existsSync(await speechFile(first.filename))).toBe(true);
+});
+
+test("still hands back the one Speech when the same Diary says it again", async () => {
+  const again = await createSpeech(
+    sharedDiaryId,
+    SHARED_TEXT,
+    SAMPLE_SHARED_AUDIO
+  );
+
+  // Scoping the collision to the Diary must not turn a Diary edited back to
+  // what it said before into a second Speech of its own.
+  expect(again.body.result.id).toBe(
+    (await findSpeech(sharedDiaryId, SHARED_TEXT)).body.result.id
+  );
+});
+
+test("keeps a Speech for a Document that says it too, not only for Diaries", async () => {
+  const document = (
+    await ipc("documents-create", {
+      uri: SAMPLE_SHARED_DOCUMENT,
+      title: "A page that says the same thing",
+    })
+  ).body.result;
+  documentId = document.id;
+
+  // A Document is spoken a paragraph at a time, so where in it the sentence
+  // falls is part of which Speech this is — unlike a Diary, which is spoken
+  // whole and so is always at the first of each.
+  const created = await ipc(
+    "speeches-create",
+    {
+      sourceId: documentId,
+      sourceType: "Document",
+      text: SHARED_TEXT,
+      section: 0,
+      segment: 0,
+      configuration: VOICE,
+    },
+    blobOf(SAMPLE_SHARED_AUDIO, "audio/mp3")
+  );
+  expect(created.status).toBe(200);
+
+  // Asked the way the ebook reader asks, which is by where in the Document it
+  // is rather than by the words.
+  const { body } = await ipc("speeches-find-one", {
+    sourceId: documentId,
+    sourceType: "Document",
+    section: 0,
+    segment: 0,
+  });
+  expect(body.result?.sourceId).toBe(documentId);
+  expect(body.result.id).not.toBe(sharedSpeech.id);
+  expect(body.result.filename).toBe(sharedSpeech.filename);
+});
+
+test("leaves the other Diary its Speech, and the audio under it, on deletion", async () => {
+  expect((await ipc("diaries-destroy", sharedDiaryId)).status).toBe(200);
+
+  const speechFor = async (id: string) =>
+    (await findSpeech(id, SHARED_TEXT)).body.result;
+
+  // Read once rather than polled: a Speech's file is taken, or left, as part of
+  // its record's departure, so answering the delete has already settled it.
+  expect(await speechFor(sharedDiaryId)).toBeNull();
+
+  const kept = await speechFor(sharingDiaryId);
+  expect(kept?.id).toBe(sharedSpeech.id);
+
+  // And the Document's, which the same file sits under: tidying up a Diary has
+  // no business emptying a page of a book.
+  const spokenPage = await ipc("speeches-find-one", {
+    sourceId: documentId,
+    sourceType: "Document",
+    section: 0,
+    segment: 0,
+  });
+  expect(spokenPage.body.result?.filename).toBe(kept.filename);
+
+  // Both halves, because the record surviving with nothing under it is a player
+  // that loads and then plays silence.
+  expect(fs.existsSync(await speechFile(kept.filename))).toBe(true);
+  const played = await fetch(
+    `${baseUrl}/media/${kept.src.replace("enjoy://", "")}`,
+    { headers: { Range: "bytes=0-99" } }
+  );
+  expect(played.status).toBe(206);
 });
 
 /**

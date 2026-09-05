@@ -1,4 +1,7 @@
-# How this fork is used
+# enjoy2 — how this fork is used
+
+Monorepo with three Yarn workspaces: `enjoy` (the language-learning app),
+`1000-hours` (VitePress book site), `1000h-portal` (Nuxt page generator).
 
 This is a personal fork, run by one person on one machine. It exists to be
 used, not to be shipped: there are no other users, no releases, and no support
@@ -44,6 +47,23 @@ works in the browser; that is the whole bar.
 
 `1000-hours` and `1000h-portal` are untouched by this. Nothing above applies to
 them.
+
+## Agent skills
+
+### Issue tracker
+
+Issues live in GitHub Issues on `yankunsong/enjoy2`, driven by the `gh` CLI.
+See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+The five canonical roles, used verbatim as label strings.
+See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Multi-context: a root `CONTEXT-MAP.md` points at one `CONTEXT.md` per workspace.
+See `docs/agents/domain.md`.
 
 ## Where the data lives
 

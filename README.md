@@ -41,6 +41,34 @@ Local Web Enjoy UI listening on http://127.0.0.1:7101/
 
 停止：在终端按 `Ctrl-C`。
 
+### macOS：做一个双击启动的 App
+
+每次开终端敲命令、并且让那个窗口一直开着，用起来是别扭的。仓库里有个生成器，
+把启动包成两个普通的 mac 应用：
+
+```bash
+./scripts/make-mac-app.sh              # 生成到 ~/Applications
+./scripts/make-mac-app.sh /Applications  # 或者别处
+```
+
+得到 `Enjoy.app` 和 `退出 Enjoy.app`。双击前者：没在跑就后台起服务、等到前端真的
+能应答了再打开浏览器；已经在跑就直接开浏览器，不会起第二份。双击后者停掉两个服务。
+两个都能拖进 Dock，也能用 Spotlight 搜到。日志在 `~/Library/Logs/enjoy-local-web.log`。
+
+生成的 App 只是个壳，逻辑在 `scripts/enjoy-local-web.sh` 里，也可以直接用：
+
+```bash
+./scripts/enjoy-local-web.sh start|open|stop|status
+```
+
+它会自己找 node（Finder 启动的应用读不到你 shell 里的 PATH），依次试 PATH、nvm、
+fnm、volta、Homebrew；都不对就用 `ENJOY_NODE_BIN` 指定。仓库换了位置，重跑一次
+`make-mac-app.sh` 即可。
+
+> **仓库放在外置磁盘上的话**，先给这两个 App 授权：**系统设置 → 隐私与安全性 →
+> 完全磁盘访问权限**，用 `+` 把它们加进去。macOS 默认不让应用读外置卷，而且是静默
+> 拒绝——没授权时双击会弹窗提示你这件事。把仓库放在内置磁盘则不需要这一步。
+
 ---
 
 ## 配置密钥
